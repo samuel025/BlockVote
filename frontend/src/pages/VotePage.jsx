@@ -3,6 +3,8 @@ import { api } from "../services/api";
 import { castVoteOnChain, isElectionActive, getCurrentElectionId, fetchOnChainResults } from "../services/blockchain";
 import { DEPLOYMENT } from "../config/deployment";
 import { useToast } from "../components/Toast";
+import * as snarkjs from "snarkjs";
+import { scanFingerprint, matricToFieldElement } from "../services/biometric";
 
 const MATRIC_PATTERN = /^FUO\/\d{2}\/[A-Z]{2,4}\/\d{3}$/;
 const STEPS = ["Verify Identity", "Select Candidate", "Confirm & Submit"];
@@ -16,7 +18,7 @@ export default function VotePage() {
   const [verifyResult, setVerifyResult] = useState(null);
   const [activeElectionId, setActiveElectionId] = useState(null);
   const [candidates, setCandidates] = useState([]);
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [selectedCandidates, setSelectedCandidates] = useState({}); // { post: candidateId }
   const [voteLoading, setVoteLoading] = useState(false);
   const [voteSuccess, setVoteSuccess] = useState(false);
   const [txHash, setTxHash] = useState("");
@@ -24,13 +26,14 @@ export default function VotePage() {
 
   async function handleVerify(e) {
     e.preventDefault();
-    if (!matricNumber.trim()) { setFieldError("Matriculation number is required."); return; }
-    if (!MATRIC_PATTERN.test(matricNumber.trim())) { setFieldError("Format must be FUO/YY/DEPT/NNN"); return; }
+    const cleanMatric = matricNumber.trim();
+    if (!cleanMatric) { setFieldError("Matriculation number is required."); return; }
+    if (!MATRIC_PATTERN.test(cleanMatric)) { setFieldError("Format must be FUO/YY/DEPT/NNN"); return; }
     setFieldError("");
     
     // Simulate Hardware Biometric Scan (Fingerprint)
     setIsScanning(true);
-    await new Promise(r => setTimeout(r, 2000));
+    const fingerprintHash = await scanFingerprint(cleanMatric);
     setIsScanning(false);
 
     setVerifyLoading(true);
@@ -40,40 +43,65 @@ export default function VotePage() {
       const active = await isElectionActive().catch(() => false);
       if (!active || !eId) { toast.error("The election is not currently active."); setVerifyLoading(false); return; }
 
-      const data = await api.verifyStudent(matricNumber.trim(), eId);
+      const data = await api.verifyStudent(cleanMatric, eId);
       if (!data.eligible) { setFieldError("You are not eligible to vote in this election."); setVerifyLoading(false); return; }
       
+      // Local ZKP Generation on the Pi
+      toast.info("Generating Zero-Knowledge Proof locally...");
+      
+      const circuitInput = {
+        matricNumber: matricToFieldElement(cleanMatric).toString(),
+        departmentId: data.student.departmentId.toString(),
+        enrollmentSecret: fingerprintHash.toString(),
+        enrollmentCommitment: data.enrollmentCommitment,
+        nullifierHash: data.nullifierHash,
+        electionId: eId.toString(),
+      };
+
+      const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+        circuitInput,
+        "/zkp/eligibility.wasm",
+        "/zkp/eligibility_final.zkey"
+      );
+
+      const calldata = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
+
       const liveCandidates = await fetchOnChainResults(eId).catch(() => []);
       
       setActiveElectionId(eId);
       setCandidates(liveCandidates);
-      setVerifyResult(data);
+      setVerifyResult({ ...data, calldata });
       setStep(1);
       toast.success(`Identity verified — Welcome, ${data.student?.name || "Student"}`);
     } catch (err) {
       if (err.status === 403) setFieldError("Student not found or not actively enrolled.");
       else if (err.status === 400) setFieldError(err.message);
-      else toast.error(err.message);
+      else toast.error(err.message || "Failed to generate proof. Ensure you are enrolled.");
     } finally {
       setVerifyLoading(false);
     }
   }
 
-  function handleSelectCandidate(candidate) {
-    setSelectedCandidate(candidate);
+  function handleSelectCandidate(post, candidateId) {
+    setSelectedCandidates(prev => ({ ...prev, [post]: candidateId }));
   }
 
   function handleProceedToConfirm() {
-    if (!selectedCandidate) { toast.error("Please select a candidate before proceeding."); return; }
+    const uniquePosts = [...new Set(candidates.map(c => c.post || "President"))];
+    if (Object.keys(selectedCandidates).length < uniquePosts.length) {
+      toast.error("Please select a candidate for each post before proceeding.");
+      return;
+    }
     setStep(2);
   }
 
   async function handleCastVote() {
-    if (!selectedCandidate || !verifyResult) return;
+    if (Object.keys(selectedCandidates).length === 0 || !verifyResult) return;
     setVoteLoading(true);
 
     try {
-      const { tx } = await castVoteOnChain(verifyResult.didHash, selectedCandidate.id, verifyResult.calldata);
+      const candidateIds = Object.values(selectedCandidates);
+      const { tx } = await castVoteOnChain(verifyResult.didHash, candidateIds, verifyResult.calldata);
       setTxHash(tx.hash);
       setVoteSuccess(true);
       setStep(3);
@@ -91,7 +119,7 @@ export default function VotePage() {
 
   function handleReset() {
     setStep(0); setMatricNumber(""); setFieldError(""); setVerifyResult(null);
-    setSelectedCandidate(null); setVoteSuccess(false); setTxHash("");
+    setSelectedCandidates({}); setVoteSuccess(false); setTxHash("");
   }
 
   return (
@@ -177,20 +205,28 @@ export default function VotePage() {
               <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Election #{activeElectionId}</span>
             </div>
             <div className="card-body">
-              <div className="candidate-grid">
-                {candidates.map((c) => (
-                  <div key={c.id} className={`candidate-card ${selectedCandidate?.id === c.id ? "selected" : ""}`}
-                    onClick={() => handleSelectCandidate(c)} role="button" tabIndex={0}
-                    onKeyDown={(e) => e.key === "Enter" && handleSelectCandidate(c)}>
-                    <div className="candidate-avatar">{c.name.split(" ").map(w => w[0]).join("")}</div>
-                    <div className="candidate-name">{c.name}</div>
-                    <div className="candidate-party">{c.party}</div>
+              {(() => {
+                const uniquePosts = [...new Set(candidates.map(c => c.post || "President"))];
+                return uniquePosts.map(post => (
+                  <div key={post} style={{ marginBottom: 24 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>{post}</h3>
+                    <div className="candidate-grid">
+                      {candidates.filter(c => (c.post || "President") === post).map((c) => (
+                        <div key={c.id} className={`candidate-card ${selectedCandidates[post] === c.id ? "selected" : ""}`}
+                          onClick={() => handleSelectCandidate(post, c.id)} role="button" tabIndex={0}
+                          onKeyDown={(e) => e.key === "Enter" && handleSelectCandidate(post, c.id)}>
+                          <div className="candidate-avatar">{c.name.split(" ").map(w => w[0]).join("")}</div>
+                          <div className="candidate-name">{c.name}</div>
+                          <div className="candidate-party">{c.party}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
+                ));
+              })()}
               <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
-                <button className="btn btn-secondary" onClick={() => { setStep(0); setVerifyResult(null); setSelectedCandidate(null); }}>← Back</button>
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleProceedToConfirm} disabled={!selectedCandidate}>
+                <button className="btn btn-secondary" onClick={() => { setStep(0); setVerifyResult(null); setSelectedCandidates({}); }}>← Back</button>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleProceedToConfirm} disabled={Object.keys(selectedCandidates).length < [...new Set(candidates.map(c => c.post || "President"))].length}>
                   Continue →
                 </button>
               </div>
@@ -209,12 +245,24 @@ export default function VotePage() {
               <div style={{ fontSize: 12 }}>This action is <strong>final and irreversible</strong>. Once submitted, your vote cannot be changed or withdrawn. Please review your selection carefully.</div>
             </div>
 
-            <div style={{ textAlign: "center", padding: "16px 0 24px" }}>
-              <div className="confirm-icon">🗳️</div>
-              <div className="confirm-text">
-                You are about to cast your vote for<br />
-                <strong style={{ fontSize: 18 }}>{selectedCandidate?.name}</strong><br />
-                <span style={{ fontSize: 12 }}>{selectedCandidate?.party}</span>
+            <div style={{ padding: "16px 0 24px" }}>
+              <div className="confirm-icon" style={{ textAlign: "center" }}>🗳️</div>
+              <div className="confirm-text" style={{ textAlign: "center", marginBottom: 16 }}>
+                You are about to cast your vote for the following:
+              </div>
+              <div style={{ background: "var(--bg-secondary)", padding: 16, borderRadius: 8 }}>
+                {Object.entries(selectedCandidates).map(([post, cId]) => {
+                  const c = candidates.find(cand => cand.id === cId);
+                  return (
+                    <div key={post} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid var(--border)" }}>
+                      <strong style={{ fontSize: 14 }}>{post}</strong>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontWeight: 600 }}>{c?.name}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{c?.party}</div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -240,14 +288,16 @@ export default function VotePage() {
 
             <div className="card" style={{ textAlign: "left", marginBottom: 24 }}>
               <div className="card-body" style={{ fontSize: 13 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ color: "var(--text-secondary)" }}>Candidate</span>
-                  <strong>{selectedCandidate?.name}</strong>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ color: "var(--text-secondary)" }}>Party</span>
-                  <span>{selectedCandidate?.party}</span>
-                </div>
+                <div style={{ marginBottom: 12, fontWeight: 600, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>Your Selections:</div>
+                {Object.entries(selectedCandidates).map(([post, cId]) => {
+                  const c = candidates.find(cand => cand.id === cId);
+                  return (
+                    <div key={post} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                      <span style={{ color: "var(--text-secondary)" }}>{post}</span>
+                      <strong style={{ textAlign: "right" }}>{c?.name} <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: "normal" }}>({c?.party})</span></strong>
+                    </div>
+                  );
+                })}
                 {txHash && (
                   <div style={{ marginTop: 8 }}>
                     <span style={{ color: "var(--text-secondary)", fontSize: 11 }}>Transaction Hash</span>

@@ -17,6 +17,8 @@ const Database = require("better-sqlite3");
 const path = require("path");
 const snarkjs = require("snarkjs");
 const { ethers } = require("ethers");
+require("dotenv").config({ path: path.join(__dirname, "../.env") });
+const fs = require("fs");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -77,16 +79,6 @@ function matricToFieldElement(matricNumber) {
   return BigInt(truncated);
 }
 
-/**
- * Generate an enrollment secret for a student (deterministic for prototype)
- */
-function generateEnrollmentSecret(matricNumber) {
-  const hash = ethers.keccak256(
-    ethers.toUtf8Bytes("ENROLLMENT_SECRET:" + matricNumber)
-  );
-  return BigInt(hash.slice(0, 64));
-}
-
 // -------------------------------------------------------
 // API Endpoints
 // -------------------------------------------------------
@@ -106,7 +98,7 @@ app.get("/api/health", (req, res) => {
 app.get("/api/students", (req, res) => {
   const students = db
     .prepare(
-      "SELECT matric_number, full_name, department_name, faculty, level, enrollment_status FROM students"
+      "SELECT matric_number, full_name, department_id, department_name, faculty, level, enrollment_status FROM students"
     )
     .all();
   res.json({ students });
@@ -114,16 +106,16 @@ app.get("/api/students", (req, res) => {
 
 /**
  * POST /api/enroll
- * Enroll a student: generate DID, enrollment commitment, and store mapping.
- * This simulates the USB token enrollment process.
+ * Enroll a student: receives enrollment commitment from the Raspberry Pi kiosk
+ * and stores the DID mapping.
  *
- * Body: { matricNumber: string }
+ * Body: { matricNumber: string, enrollmentCommitment: string }
  */
 app.post("/api/enroll", async (req, res) => {
   try {
-    const { matricNumber } = req.body;
-    if (!matricNumber) {
-      return res.status(400).json({ error: "matricNumber is required" });
+    const { matricNumber, enrollmentCommitment } = req.body;
+    if (!matricNumber || !enrollmentCommitment) {
+      return res.status(400).json({ error: "matricNumber and enrollmentCommitment are required" });
     }
 
     // Check student exists and is active
@@ -156,26 +148,19 @@ app.post("/api/enroll", async (req, res) => {
 
     // Generate field elements
     const matricField = matricToFieldElement(matricNumber);
-    const departmentId = BigInt(student.department_id);
-    const enrollmentSecret = generateEnrollmentSecret(matricNumber);
 
     // Compute DID hash: Poseidon(matricField)
     const didRaw = p([matricField]);
     const didHash = p.F.toString(didRaw);
 
-    // Compute enrollment commitment: Poseidon(matricField, departmentId, enrollmentSecret)
-    const commitmentRaw = p([matricField, departmentId, enrollmentSecret]);
-    const enrollmentCommitment = p.F.toString(commitmentRaw);
-
     // Store mapping
     db.prepare(
-      `INSERT INTO did_mappings (matric_number, did_hash, enrollment_commitment, enrollment_secret)
-       VALUES (?, ?, ?, ?)`
+      `INSERT INTO did_mappings (matric_number, did_hash, enrollment_commitment)
+       VALUES (?, ?, ?)`
     ).run(
       matricNumber,
       didHash,
-      enrollmentCommitment,
-      enrollmentSecret.toString()
+      enrollmentCommitment
     );
 
     res.json({
@@ -196,12 +181,11 @@ app.post("/api/enroll", async (req, res) => {
 
 /**
  * POST /api/verify
- * Verify a student's eligibility and generate a zk-SNARK proof.
- * This is the core endpoint called during the voting flow.
+ * Returns voter data so the Raspberry Pi kiosk can generate the zk-SNARK proof locally.
  *
  * Body: { matricNumber: string, electionId: number }
  *
- * Returns: { proof, publicSignals, didHash, calldata }
+ * Returns: { eligible, didHash, enrollmentCommitment, nullifierHash, student }
  */
 app.post("/api/verify", async (req, res) => {
   try {
@@ -239,73 +223,23 @@ app.post("/api/verify", async (req, res) => {
 
     const p = await getPoseidon();
 
-    // Reconstruct the private inputs
+    // Reconstruct the public inputs for verification
     const matricField = matricToFieldElement(matricNumber);
-    const departmentId = BigInt(student.department_id);
-    const enrollmentSecret = BigInt(mapping.enrollment_secret);
     const elId = BigInt(electionId);
-
-    // Compute enrollment commitment
-    const commitmentRaw = p([matricField, departmentId, enrollmentSecret]);
-    const enrollmentCommitment = p.F.toString(commitmentRaw);
 
     // Compute nullifier hash
     const nullifierRaw = p([matricField, elId]);
     const nullifierHash = p.F.toString(nullifierRaw);
 
-    // Build circuit input
-    const circuitInput = {
-      matricNumber: matricField.toString(),
-      departmentId: departmentId.toString(),
-      enrollmentSecret: enrollmentSecret.toString(),
-      enrollmentCommitment: enrollmentCommitment,
-      nullifierHash: nullifierHash,
-      electionId: elId.toString(),
-    };
-
-    // Check if ZKP artifacts exist
-    const fs = require("fs");
-    if (!fs.existsSync(WASM_PATH) || !fs.existsSync(ZKEY_PATH)) {
-      // Return the data without proof if ZKP not yet set up
-      return res.json({
-        eligible: true,
-        didHash: mapping.did_hash,
-        enrollmentCommitment,
-        nullifierHash,
-        zkpAvailable: false,
-        message: "ZKP artifacts not available. Run setup-zkp.js first.",
-        student: {
-          name: student.full_name,
-          department: student.department_name,
-        },
-      });
-    }
-
-    // Generate the Groth16 proof
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-      circuitInput,
-      WASM_PATH,
-      ZKEY_PATH
-    );
-
-    // Generate Solidity calldata for on-chain verification
-    const calldata = await snarkjs.groth16.exportSolidityCallData(
-      proof,
-      publicSignals
-    );
-
     res.json({
       eligible: true,
       didHash: mapping.did_hash,
-      enrollmentCommitment,
+      enrollmentCommitment: mapping.enrollment_commitment,
       nullifierHash,
-      zkpAvailable: true,
-      proof,
-      publicSignals,
-      calldata,
       student: {
         name: student.full_name,
         department: student.department_name,
+        departmentId: student.department_id,
       },
     });
   } catch (err) {
@@ -342,6 +276,58 @@ app.get("/api/enrollment-commitments", (req, res) => {
 });
 
 // -------------------------------------------------------
+// Relayer Voting Endpoint (Gasless UX)
+// -------------------------------------------------------
+app.post("/api/relay-vote", async (req, res) => {
+  try {
+    const { didHash, candidateIds, calldataStr } = req.body;
+    if (!didHash || !candidateIds || !Array.isArray(candidateIds) || !calldataStr) {
+      return res.status(400).json({ error: "Missing or invalid required parameters" });
+    }
+
+    const deployment = JSON.parse(fs.readFileSync(path.join(__dirname, "../deployment.json"), "utf8"));
+    const eligibilityAbi = JSON.parse(fs.readFileSync(path.join(__dirname, "../artifacts/contracts/VoterEligibility.sol/VoterEligibility.json"), "utf8")).abi;
+    const votingAbi = JSON.parse(fs.readFileSync(path.join(__dirname, "../artifacts/contracts/Voting.sol/Voting.json"), "utf8")).abi;
+
+    const rpcUrl = process.env.SEPOLIA_RPC_URL || "http://127.0.0.1:8545";
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    
+    let signer;
+    if (process.env.PRIVATE_KEY) {
+      signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+    } else {
+      signer = await provider.getSigner(0);
+    }
+
+    const eligibility = new ethers.Contract(deployment.contracts.VoterEligibility, eligibilityAbi, signer);
+    const voting = new ethers.Contract(deployment.contracts.Voting, votingAbi, signer);
+
+    const bytes32Did = didHash.startsWith("0x")
+      ? ethers.zeroPadValue(ethers.toBeHex(BigInt(didHash.replace("0x", ""), 16)), 32)
+      : ethers.zeroPadValue(ethers.toBeHex(BigInt(didHash)), 32);
+
+    const currentElectionId = await voting.electionId();
+    const isElig = await eligibility.isEligible(currentElectionId, bytes32Did);
+
+    if (!isElig) {
+      const args = new Function(`return [${calldataStr}]`)();
+      const [pA, pB, pC, pubSignals] = args;
+      
+      const verifyTx = await eligibility.verifyAndRegister(pA, pB, pC, pubSignals, bytes32Did);
+      await verifyTx.wait();
+    }
+
+    const voteTx = await voting.castVote(bytes32Did, candidateIds);
+    await voteTx.wait();
+
+    res.json({ success: true, txHash: voteTx.hash });
+  } catch (err) {
+    console.error("Relay Vote Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -------------------------------------------------------
 // Start Server
 // -------------------------------------------------------
 app.listen(PORT, () => {
@@ -352,7 +338,7 @@ app.listen(PORT, () => {
   console.log(`\nEndpoints:`);
   console.log(`  GET  /api/health`);
   console.log(`  GET  /api/students`);
-  console.log(`  POST /api/enroll     { matricNumber }`);
+  console.log(`  POST /api/enroll     { matricNumber, enrollmentCommitment }`);
   console.log(`  POST /api/verify     { matricNumber, electionId }`);
   console.log(`  GET  /api/election/:id`);
   console.log(`  GET  /api/enrollment-commitments`);

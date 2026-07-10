@@ -129,7 +129,7 @@ describe("Voting System", function () {
       const pubSignals = [BigInt(commitment), BigInt(nullifier), electionId];
 
       await eligibility.verifyAndRegister(pA, pB, pC, pubSignals, didHash);
-      expect(await eligibility.isEligible(didHash)).to.be.true;
+      expect(await eligibility.isEligible(electionId, didHash)).to.be.true;
     });
 
     it("Should prevent double registration (same nullifier)", async function () {
@@ -156,16 +156,16 @@ describe("Voting System", function () {
     before(async function () {
       // Initialize election
       const now = Math.floor(Date.now() / 1000);
-      await voting.initializeElection(1, now - 100, now + 86400);
+      await voting.initializeElection(1, "SGA Election", now - 100, now + 86400);
 
       // Add candidates
-      await voting.addCandidate(1, "Adewale Johnson", "PSA");
-      await voting.addCandidate(2, "Chioma Okafor", "SUF");
-      await voting.addCandidate(3, "Emeka Nwosu", "AEM");
+      await voting.addCandidate(1, "Adewale Johnson", "PSA", "President");
+      await voting.addCandidate(2, "Chioma Okafor", "SUF", "President");
+      await voting.addCandidate(3, "Emeka Nwosu", "AEM", "Secretary");
     });
 
     it("Should have 3 candidates", async function () {
-      expect(await voting.candidateCount()).to.equal(3);
+      expect(await voting.candidateCount(electionId)).to.equal(3);
     });
 
     it("Should allow an eligible voter to cast a vote", async function () {
@@ -175,9 +175,9 @@ describe("Voting System", function () {
         32
       );
 
-      await voting.castVote(didHash, 1);
-      expect(await voting.hasVoterVoted(didHash)).to.be.true;
-      expect(await voting.totalVotesCast()).to.equal(1);
+      await voting.castVote(didHash, [1, 3]);
+      expect(await voting.hasVoterVoted(electionId, didHash)).to.be.true;
+      expect(await voting.totalVotesCast(electionId)).to.equal(1);
     });
 
     it("Should prevent double voting", async function () {
@@ -187,14 +187,14 @@ describe("Voting System", function () {
         32
       );
 
-      await expect(voting.castVote(didHash, 2)).to.be.revertedWith(
+      await expect(voting.castVote(didHash, [2])).to.be.revertedWith(
         "Voting: already voted"
       );
     });
 
     it("Should reject ineligible voter", async function () {
       const fakeDid = ethers.zeroPadValue(ethers.toBeHex(12345n), 32);
-      await expect(voting.castVote(fakeDid, 1)).to.be.revertedWith(
+      await expect(voting.castVote(fakeDid, [1])).to.be.revertedWith(
         "Voting: voter is not eligible"
       );
     });
@@ -218,29 +218,22 @@ describe("Voting System", function () {
       const pubSignals = [BigInt(commitment), BigInt(nullifier), electionId];
       await eligibility.verifyAndRegister(pA, pB, pC, pubSignals, didHash);
 
-      await expect(voting.castVote(didHash, 99)).to.be.revertedWith(
+      await expect(voting.castVote(didHash, [99])).to.be.revertedWith(
         "Voting: candidate does not exist"
       );
     });
 
     it("Should return correct results via self-tallying", async function () {
-      const [ids, names, parties, voteCounts] = await voting.getResults();
+      const [ids, names, parties, posts, voteCounts] = await voting.getResults(electionId);
       expect(ids.length).to.equal(3);
       expect(voteCounts[0]).to.equal(1); // Candidate 1 has 1 vote
       expect(voteCounts[1]).to.equal(0);
-      expect(voteCounts[2]).to.equal(0);
-    });
-
-    it("Should return the correct winner", async function () {
-      const [winnerId, winnerName, winnerVotes] = await voting.getWinner();
-      expect(winnerId).to.equal(1);
-      expect(winnerName).to.equal("Adewale Johnson");
-      expect(winnerVotes).to.equal(1);
+      expect(voteCounts[2]).to.equal(1); // Candidate 3 has 1 vote (from our castVote[1,3])
     });
 
     it("Should reject non-admin from adding candidates", async function () {
       await expect(
-        voting.connect(attacker).addCandidate(10, "Intruder", "None")
+        voting.connect(attacker).addCandidate(10, "Intruder", "None", "President")
       ).to.be.revertedWith("Voting: caller is not admin");
     });
   });

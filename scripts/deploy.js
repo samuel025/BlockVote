@@ -80,36 +80,7 @@ async function main() {
   console.log("   ✓ VotingPaymaster deployed at:", paymasterAddr);
 
   // -------------------------------------------------------
-  // Initialize Election
-  // -------------------------------------------------------
-  console.log("\n--- Initializing Election ---");
-
-  // Create election in eligibility contract
-  const electionId = 1;
-  await eligibility.createElection(electionId);
-  console.log("   ✓ Election created with ID:", electionId);
-
-  // Initialize election in voting contract
-  const now = Math.floor(Date.now() / 1000);
-  const startTime = now;
-  const endTime = now + 86400; // 24 hours
-  await voting.initializeElection(electionId, startTime, endTime);
-  console.log("   ✓ Election initialized (24h window)");
-
-  // Add candidates
-  const candidates = [
-    { id: 1, name: "Adewale Johnson", party: "Progressive Students Alliance" },
-    { id: 2, name: "Chioma Okafor", party: "Students United Front" },
-    { id: 3, name: "Emeka Nwosu", party: "Academic Excellence Movement" },
-  ];
-
-  for (const c of candidates) {
-    await voting.addCandidate(c.id, c.name, c.party);
-    console.log(`   ✓ Candidate added: ${c.name} (${c.party})`);
-  }
-
-  // -------------------------------------------------------
-  // Save deployment addresses
+  // Save deployment addresses (Blank Election State)
   // -------------------------------------------------------
   const deployment = {
     network: "localhost",
@@ -123,17 +94,22 @@ async function main() {
       VotingPaymaster: paymasterAddr,
     },
     election: {
-      id: electionId,
-      startTime,
-      endTime,
-      candidates,
+      id: 0,
+      startTime: 0,
+      endTime: 0,
+      candidates: [],
     },
     deployedAt: new Date().toISOString(),
   };
 
   const deploymentPath = path.join(__dirname, "../deployment.json");
+  const frontendDeploymentPath = path.join(__dirname, "../frontend/src/config/deployment.json");
+  
   fs.writeFileSync(deploymentPath, JSON.stringify(deployment, null, 2));
+  fs.writeFileSync(frontendDeploymentPath, JSON.stringify(deployment, null, 2));
+  
   console.log(`\n✓ Deployment addresses saved to ${deploymentPath}`);
+  console.log(`✓ Deployment addresses synced to ${frontendDeploymentPath}`);
   console.log("\n=== Deployment Complete ===");
 }
 

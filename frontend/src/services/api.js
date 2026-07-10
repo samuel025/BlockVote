@@ -20,6 +20,7 @@ async function request(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
   const config = {
     headers: { "Content-Type": "application/json" },
+    cache: "no-store",
     ...options,
   };
 
@@ -62,11 +63,11 @@ export const api = {
   /** Fetch all students */
   getStudents: () => request("/api/students"),
 
-  /** Enroll a student for voting (generates DID + enrollment commitment) */
-  enrollStudent: (matricNumber) =>
+  /** Enroll a student for voting (sends enrollment commitment) */
+  enrollStudent: (matricNumber, enrollmentCommitment) =>
     request("/api/enroll", {
       method: "POST",
-      body: JSON.stringify({ matricNumber }),
+      body: JSON.stringify({ matricNumber, enrollmentCommitment }),
     }),
 
   /** Verify eligibility and generate ZKP */

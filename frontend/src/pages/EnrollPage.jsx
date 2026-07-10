@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "../services/api";
 import { useToast } from "../components/Toast";
+import { scanFingerprint, getPoseidon, matricToFieldElement } from "../services/biometric";
 
 const MATRIC_PATTERN = /^FUO\/\d{2}\/[A-Z]{2,4}\/\d{3}$/;
 
@@ -19,22 +20,41 @@ export default function EnrollPage() {
 
   async function handleEnroll(e) {
     e.preventDefault();
-    const err = validate(matricNumber);
+    const cleanMatric = matricNumber.trim();
+    const err = validate(cleanMatric);
     if (err) { setFieldError(err); return; }
     setFieldError("");
     setLoading(true);
     setResult(null);
 
     try {
-      const data = await api.enrollStudent(matricNumber.trim());
+      // 1. Fetch students to get department_id
+      const { students } = await api.getStudents();
+      const student = students.find(s => s.matric_number === cleanMatric);
+      
+      if (!student || student.enrollment_status !== "ACTIVE") {
+        throw new Error("Student not found or not actively enrolled.");
+      }
+
+      toast.info("Scanning fingerprint...");
+      
+      // 2. Scan fingerprint locally (mocked)
+      const fingerprintHash = await scanFingerprint(cleanMatric);
+      
+      // 3. Compute Poseidon hash locally
+      const p = await getPoseidon();
+      const matricField = matricToFieldElement(cleanMatric);
+      const deptId = BigInt(student.department_id);
+      
+      const commitmentRaw = p([matricField, deptId, BigInt(fingerprintHash)]);
+      const enrollmentCommitment = p.F.toString(commitmentRaw);
+
+      // 4. Send only commitment to backend
+      const data = await api.enrollStudent(cleanMatric, enrollmentCommitment);
       setResult(data);
       toast.success(data.message || "Enrollment successful");
     } catch (err) {
-      if (err.status === 404) {
-        setFieldError("Student not found or not actively enrolled. Check your matriculation number.");
-      } else {
-        toast.error(err.message);
-      }
+      toast.error(err.message || "Enrollment failed");
     } finally {
       setLoading(false);
     }
@@ -51,10 +71,11 @@ export default function EnrollPage() {
       <div className="alert alert-info">
         <span className="alert-icon">ℹ</span>
         <div>
-          <strong>Enrollment Process</strong>
+          <strong>Enrollment Process (Kiosk Mode)</strong>
           <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.5 }}>
-            Enter your matriculation number to generate your Decentralized Identifier (DID) and enrollment commitment.
-            This step is required before you can cast a vote.
+            Enter your matriculation number and scan your biometric. 
+            The system will generate your Decentralized Identifier (DID) and enrollment commitment locally. 
+            Your biometric data never leaves this device.
           </div>
         </div>
       </div>

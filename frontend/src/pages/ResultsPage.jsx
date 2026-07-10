@@ -51,8 +51,7 @@ export default function ResultsPage() {
     }
   }
 
-  const leadingCandidate = results.length > 0 ? results[0] : null;
-  const isTied = results.length > 1 && results[0].voteCount === results[1].voteCount && results[0].voteCount > 0;
+  const uniquePostsCount = [...new Set(results.map(r => r.post || "President"))].length;
 
   if (loading) {
     return <div className="loading-state"><div className="spinner spinner-lg" /><span>Fetching on-chain results…</span></div>;
@@ -65,14 +64,14 @@ export default function ResultsPage() {
       <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         <div className="stat-card">
           <div className="stat-icon amber">🗳</div>
-          <div><div className="stat-label">Total Votes</div><div className="stat-value">{totalVotes}</div></div>
+          <div><div className="stat-label">Total Voters</div><div className="stat-value">{totalVotes}</div></div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon blue">👤</div>
+          <div className="stat-icon blue">📋</div>
           <div>
-            <div className="stat-label">Leading</div>
+            <div className="stat-label">Open Posts</div>
             <div className="stat-value" style={{ fontSize: 16 }}>
-              {totalVotes === 0 ? "—" : isTied ? "Tied" : leadingCandidate?.name}
+              {uniquePostsCount} {uniquePostsCount === 1 ? "Position" : "Positions"}
             </div>
           </div>
         </div>
@@ -119,37 +118,68 @@ export default function ResultsPage() {
               <div style={{ fontSize: 13 }}>Votes will appear here once they are cast on-chain.</div>
             </div>
           ) : (
-            results.map((r, i) => {
-              const pct = totalVotes > 0 ? ((r.voteCount / totalVotes) * 100).toFixed(1) : 0;
-              const isLeader = i === 0 && r.voteCount > 0 && !isTied;
+            (() => {
+              const uniquePosts = [...new Set(results.map(r => r.post || "President"))];
               return (
-                <div key={r.id} className="result-item" style={{ padding: "14px 0", borderBottom: i < results.length - 1 ? "1px solid var(--border)" : "none" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 8 }}>
-                    <div style={{
-                      width: 40, height: 40, borderRadius: "50%", display: "flex", alignItems: "center",
-                      justifyContent: "center", fontSize: 14, fontWeight: 700, flexShrink: 0,
-                      background: isLeader ? "var(--accent)" : "var(--bg-input)", color: isLeader ? "#fff" : "var(--text-secondary)"
-                    }}>
-                      #{i + 1}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div className="result-header" style={{ marginBottom: 2 }}>
-                        <div>
-                          <span className="result-name">{r.name}</span>
-                          {isLeader && <span className="badge badge-active" style={{ marginLeft: 8, fontSize: 10 }}>Leading</span>}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 24 }}>
+                  {uniquePosts.map(post => {
+                    const postResults = results.filter(r => (r.post || "President") === post).sort((a, b) => b.voteCount - a.voteCount);
+                    const isTiedPost = postResults.length > 1 && postResults[0].voteCount === postResults[1].voteCount && postResults[0].voteCount > 0;
+                    
+                    return (
+                      <div key={post} className="card" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", boxShadow: "none", marginBottom: 0 }}>
+                        <div className="card-header" style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", background: "rgba(0,0,0,0.02)" }}>
+                          <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            {post}
+                            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", background: "var(--bg-badge)", padding: "2px 8px", borderRadius: 12 }}>
+                              {postResults.length} Candidates
+                            </span>
+                          </h3>
                         </div>
-                        <span className="result-votes">{r.voteCount} vote{r.voteCount !== 1 ? "s" : ""}</span>
+                        <div className="card-body" style={{ padding: "0 20px 20px" }}>
+                          {postResults.map((r, i) => {
+                            const pct = totalVotes > 0 ? ((r.voteCount / totalVotes) * 100).toFixed(1) : 0;
+                            const isLeader = i === 0 && r.voteCount > 0 && !isTiedPost;
+                            const badgeText = active ? "Leading" : "Winner 🏆";
+                            const badgeStyle = active ? {} : { background: "var(--warning)", color: "#000", fontWeight: 800 };
+
+                            return (
+                              <div key={r.id} className="result-item" style={{ padding: "16px 0", borderBottom: i < postResults.length - 1 ? "1px solid var(--border)" : "none" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
+                                  <div style={{
+                                    width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center",
+                                    justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0,
+                                    background: isLeader ? (active ? "var(--accent)" : "var(--warning)") : "var(--bg-input)", 
+                                    color: isLeader ? (active ? "#fff" : "#000") : "var(--text-secondary)",
+                                    boxShadow: isLeader && !active ? "0 0 10px rgba(245, 158, 11, 0.3)" : "none"
+                                  }}>
+                                    #{i + 1}
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div className="result-header" style={{ marginBottom: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center" }}>
+                                        <span className="result-name" style={{ fontSize: 15 }}>{r.name}</span>
+                                        {isLeader && <span className="badge badge-active" style={{ marginLeft: 8, fontSize: 10, ...badgeStyle }}>{badgeText}</span>}
+                                      </div>
+                                      <span className="result-votes" style={{ fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>{r.voteCount} vote{r.voteCount !== 1 ? "s" : ""}</span>
+                                    </div>
+                                    <div className="result-party" style={{ fontSize: 12 }}>{r.party}</div>
+                                  </div>
+                                </div>
+                                <div className="result-bar-bg" style={{ height: 8, background: "var(--bg-input)", borderRadius: 4 }}>
+                                  <div className="result-bar-fill" style={{ width: `${pct}%`, background: COLORS[i % COLORS.length], borderRadius: 4, height: "100%" }} />
+                                </div>
+                                <div className="result-percent" style={{ fontSize: 11, marginTop: 6, color: "var(--text-tertiary)" }}>{pct}% of total voters</div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className="result-party">{r.party}</div>
-                    </div>
-                  </div>
-                  <div className="result-bar-bg" style={{ height: 12 }}>
-                    <div className="result-bar-fill" style={{ width: `${pct}%`, background: COLORS[i % COLORS.length] }} />
-                  </div>
-                  <div className="result-percent">{pct}% of total votes</div>
+                    );
+                  })}
                 </div>
               );
-            })
+            })()
           )}
         </div>
       </div>

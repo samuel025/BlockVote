@@ -13,6 +13,11 @@ const DB_PATH = path.join(__dirname, "university.db");
 function seed() {
   const db = new Database(DB_PATH);
 
+  // Drop existing tables to apply schema changes
+  db.exec("DROP TABLE IF EXISTS did_mappings");
+  db.exec("DROP TABLE IF EXISTS students");
+  db.exec("DROP TABLE IF EXISTS elections");
+
   // Create students table
   db.exec(`
     CREATE TABLE IF NOT EXISTS students (
@@ -37,7 +42,6 @@ function seed() {
       matric_number TEXT UNIQUE NOT NULL,
       did_hash TEXT NOT NULL,
       enrollment_commitment TEXT NOT NULL,
-      enrollment_secret TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (matric_number) REFERENCES students(matric_number)
     )
@@ -91,12 +95,6 @@ function seed() {
     }
   });
   insertMany(students);
-
-  // Insert a sample election
-  db.prepare(`
-    INSERT INTO elections (title, election_id, status, start_time, end_time)
-    VALUES (?, ?, ?, datetime('now'), datetime('now', '+1 day'))
-  `).run("2025 SUG Presidential Election", 1, "ACTIVE");
 
   console.log(`✓ Database seeded at ${DB_PATH}`);
   console.log(`  - ${students.length} students inserted`);

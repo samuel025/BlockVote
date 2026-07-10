@@ -69,11 +69,12 @@ export async function getCurrentElectionId() {
  */
 export async function fetchOnChainResults(electionId) {
   const voting = getVotingContract();
-  const [ids, names, parties, voteCounts] = await voting.getResults(electionId);
+  const [ids, names, parties, posts, voteCounts] = await voting.getResults(electionId);
   return ids.map((id, i) => ({
     id: Number(id),
     name: names[i],
     party: parties[i],
+    post: posts[i],
     voteCount: Number(voteCounts[i]),
   }));
 }
@@ -121,46 +122,22 @@ export async function hasVoted(electionId, didHash) {
  * Cast a vote on-chain via admin signer
  * This handles BOTH the ZKP verification and the voting transaction.
  */
-export async function castVoteOnChain(didHash, candidateId, calldataStr) {
-  const signer = await getSigner();
-  
-  // 1. Verify ZKP on Eligibility Contract
-  const eligibility = new ethers.Contract(
-    DEPLOYMENT.contracts.VoterEligibility,
-    ELIGIBILITY_ABI,
-    signer
-  );
-  
-  const bytes32Did = didHash.startsWith("0x")
-    ? ethers.zeroPadValue(ethers.toBeHex(BigInt(didHash.replace("0x", ""), 16)), 32)
-    : ethers.zeroPadValue(ethers.toBeHex(BigInt(didHash)), 32);
+export async function castVoteOnChain(didHash, candidateIds, calldataStr) {
+  // Option B: Gasless Backend Relayer
+  // We send the vote payload to the backend, which pays the gas and signs the transaction.
+  const response = await fetch(`${DEPLOYMENT.apiUrl}/api/relay-vote`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ didHash, candidateIds, calldataStr })
+  });
 
-  // Check if already eligible
-  const currentElectionId = await getCurrentElectionId();
-  const isElig = await eligibility.isEligible(currentElectionId, bytes32Did);
-  
-  if (!isElig) {
-    if (!calldataStr) throw new Error("Missing ZKP calldata for verification.");
-    
-    // Parse the snarkjs calldata string into an array of arguments
-    const args = new Function(`return [${calldataStr}]`)();
-    const [pA, pB, pC, pubSignals] = args;
-    
-    // Submit the proof to the blockchain
-    const verifyTx = await eligibility.verifyAndRegister(pA, pB, pC, pubSignals, bytes32Did);
-    await verifyTx.wait();
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || "Failed to relay vote transaction");
   }
 
-  // 2. Cast the vote
-  const voting = new ethers.Contract(
-    DEPLOYMENT.contracts.Voting,
-    VOTING_ABI,
-    signer
-  );
-  
-  const tx = await voting.castVote(bytes32Did, candidateId);
-  const receipt = await tx.wait();
-  return { tx, receipt };
+  const data = await response.json();
+  return { tx: { hash: data.txHash }, receipt: { status: 1 } };
 }
 
 /**
