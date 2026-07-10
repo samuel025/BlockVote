@@ -1,0 +1,8 @@
+import serial, time
+
+uart = serial.Serial('/dev/serial0', baudrate=57600, timeout=2)
+packet = bytes([0xEF, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0x03, 0x01, 0x00, 0x05])
+uart.write(packet)
+time.sleep(0.5)
+resp = uart.read(20)
+print('Bytes received:', resp)
