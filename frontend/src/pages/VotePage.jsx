@@ -3,10 +3,11 @@ import { api } from "../services/api";
 import { castVoteOnChain, isElectionActive, getCurrentElectionId, fetchOnChainResults } from "../services/blockchain";
 import { DEPLOYMENT } from "../config/deployment";
 import { useToast } from "../components/Toast";
+import { QRCodeSVG } from "qrcode.react";
 import * as snarkjs from "snarkjs";
 import { scanFingerprint, matricToFieldElement } from "../services/biometric";
 
-const MATRIC_PATTERN = /^FUO\/\d{2}\/[A-Z]{2,4}\/\d{3}$/;
+const MATRIC_PATTERN = /^\d{4}\/\d\/\d{5}[A-Z]{2}$/i;
 const STEPS = ["Verify Identity", "Select Candidate", "Confirm & Submit"];
 
 export default function VotePage() {
@@ -28,7 +29,7 @@ export default function VotePage() {
     e.preventDefault();
     const cleanMatric = matricNumber.trim();
     if (!cleanMatric) { setFieldError("Matriculation number is required."); return; }
-    if (!MATRIC_PATTERN.test(cleanMatric)) { setFieldError("Format must be FUO/YY/DEPT/NNN"); return; }
+    if (!MATRIC_PATTERN.test(cleanMatric)) { setFieldError("Format must be YYYY/X/NNNNNDD (e.g. 2021/1/81878CT)"); return; }
     setFieldError("");
     
     // Simulate Hardware Biometric Scan (Fingerprint)
@@ -299,15 +300,28 @@ export default function VotePage() {
                   );
                 })}
                 {txHash && (
-                  <div style={{ marginTop: 8 }}>
-                    <span style={{ color: "var(--text-secondary)", fontSize: 11 }}>Transaction Hash</span>
-                    <input className="form-input" readOnly value={txHash} style={{ fontFamily: "monospace", fontSize: 11, marginTop: 4 }} />
+                  <div style={{ marginTop: 16, textAlign: "center", borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                    <div style={{ color: "var(--text-secondary)", fontSize: 12, marginBottom: 12, fontWeight: 600 }}>Verify on Blockchain</div>
+                    <div style={{ display: "inline-block", padding: 12, background: "white", borderRadius: 8, border: "1px solid var(--border)" }}>
+                      <QRCodeSVG 
+                        value={`https://sepolia.etherscan.io/tx/${txHash}`} 
+                        size={150}
+                        bgColor={"#ffffff"}
+                        fgColor={"#000000"}
+                        level={"Q"}
+                      />
+                    </div>
+                    <div style={{ marginTop: 12 }}>
+                      <a href={`https://sepolia.etherscan.io/tx/${txHash}`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none", fontWeight: 600 }}>
+                        View on Sepolia Etherscan ↗
+                      </a>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
 
-            <button className="btn btn-secondary" onClick={handleReset}>Return to Start</button>
+            <button className="btn btn-secondary" onClick={handleReset}>Finish & Next Voter</button>
           </div>
         </div>
       )}

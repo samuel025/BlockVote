@@ -3,7 +3,7 @@ import { api } from "../services/api";
 import { useToast } from "../components/Toast";
 import { scanFingerprint, getPoseidon, matricToFieldElement } from "../services/biometric";
 
-const MATRIC_PATTERN = /^FUO\/\d{2}\/[A-Z]{2,4}\/\d{3}$/;
+const MATRIC_PATTERN = /^\d{4}\/\d\/\d{5}[A-Z]{2}$/i;
 
 export default function EnrollPage() {
   const [matricNumber, setMatricNumber] = useState("");
@@ -14,7 +14,7 @@ export default function EnrollPage() {
 
   function validate(value) {
     if (!value.trim()) return "Matriculation number is required.";
-    if (!MATRIC_PATTERN.test(value.trim())) return "Format must be FUO/YY/DEPT/NNN (e.g. FUO/21/CSC/001)";
+    if (!MATRIC_PATTERN.test(value.trim())) return "Format must be YYYY/X/NNNNNDD (e.g. 2021/1/81878CT)";
     return "";
   }
 

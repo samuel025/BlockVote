@@ -4,10 +4,12 @@ import { DEPLOYMENT, VOTING_ABI, ELIGIBILITY_ABI } from "../config/deployment";
 import { getProvider, fetchOnChainResults } from "../services/blockchain";
 import { api } from "../services/api";
 import { useToast } from "../components/Toast";
+import StudentsPage from "./StudentsPage";
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("election");
   const toast = useToast();
 
   // On-chain state
@@ -89,8 +91,8 @@ export default function AdminPage() {
     }
   }
 
-  async function getAdminSigner() {
-    return getProvider().getSigner(0);
+  function getAuthHeader() {
+    return { "Authorization": `Bearer ${localStorage.getItem("admin_pin")}` };
   }
 
   // 1. End Election
@@ -98,10 +100,11 @@ export default function AdminPage() {
     if (!window.confirm("Are you sure you want to STOP this election? This cannot be undone.")) return;
     setLoading(true);
     try {
-      const signer = await getAdminSigner();
-      const voting = new ethers.Contract(DEPLOYMENT.contracts.Voting, VOTING_ABI, signer);
-      const tx = await voting.endElection();
-      await tx.wait();
+      const res = await fetch(`${DEPLOYMENT.apiUrl}/api/relay/admin/end-election`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() }
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
       toast.success("Election stopped successfully!");
       loadAdminData();
     } catch (err) {
@@ -122,25 +125,16 @@ export default function AdminPage() {
 
     setLoading(true);
     try {
-      const signer = await getAdminSigner();
-      const eligibility = new ethers.Contract(DEPLOYMENT.contracts.VoterEligibility, ELIGIBILITY_ABI, signer);
-      const voting = new ethers.Contract(DEPLOYMENT.contracts.Voting, VOTING_ABI, signer);
-
-      if (electionState.active) {
-        let endTx = await voting.endElection();
-        await endTx.wait();
-      }
-
       const id = parseInt(newElectionId);
-      
-      let tx = await eligibility.createElection(id);
-      await tx.wait();
-
       const now = Math.floor(Date.now() / 1000);
       const end = now + (parseInt(durationHours) * 3600);
       
-      tx = await voting.initializeElection(id, newElectionName, now, end);
-      await tx.wait();
+      const res = await fetch(`${DEPLOYMENT.apiUrl}/api/relay/admin/create-election`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ electionId: id, title: newElectionName, now, endTime: end })
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
 
       toast.success(`Election #${id} successfully created and initialized on-chain!`);
       setNewElectionId("");
@@ -159,11 +153,12 @@ export default function AdminPage() {
     setLoading(true);
 
     try {
-      const signer = await getAdminSigner();
-      const voting = new ethers.Contract(DEPLOYMENT.contracts.Voting, VOTING_ABI, signer);
-
-      const tx = await voting.addCandidate(parseInt(candidateId), candidateName, candidateParty, candidatePost);
-      await tx.wait();
+      const res = await fetch(`${DEPLOYMENT.apiUrl}/api/relay/admin/add-candidate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ candidateId: parseInt(candidateId), name: candidateName, party: candidateParty, post: candidatePost })
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
 
       toast.success(`Candidate ${candidateName} added successfully to ${candidatePost}!`);
       setCandidateId("");
@@ -189,8 +184,7 @@ export default function AdminPage() {
         return;
       }
 
-      const signer = await getAdminSigner();
-      const eligibility = new ethers.Contract(DEPLOYMENT.contracts.VoterEligibility, ELIGIBILITY_ABI, signer);
+      const eligibility = new ethers.Contract(DEPLOYMENT.contracts.VoterEligibility, ELIGIBILITY_ABI, getProvider());
 
       // Filter only unsynced commitments
       const unsyncedHashes = [];
@@ -208,8 +202,12 @@ export default function AdminPage() {
         return;
       }
 
-      const tx = await eligibility.addEnrollmentCommitments(unsyncedHashes);
-      await tx.wait();
+      const res = await fetch(`${DEPLOYMENT.apiUrl}/api/relay/admin/sync-commitments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ commitments: unsyncedHashes })
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
 
       toast.success(`Successfully synced ${unsyncedHashes.length} new commitments to the blockchain!`);
       loadAdminData();
@@ -239,7 +237,27 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {electionState.id === 0 ? (
+      {/* Tabs — always visible */}
+      <div style={{ display: "flex", gap: "12px", marginBottom: "28px", borderBottom: "2px solid var(--border)", paddingBottom: "4px" }}>
+        <button
+          className={`btn btn-sm ${activeTab === "election" ? "btn-primary" : "btn-ghost"}`}
+          onClick={() => setActiveTab("election")}
+          style={{ fontWeight: 600 }}
+        >
+          ⚙️ Election Control
+        </button>
+        <button
+          className={`btn btn-sm ${activeTab === "students" ? "btn-primary" : "btn-ghost"}`}
+          onClick={() => setActiveTab("students")}
+          style={{ fontWeight: 600 }}
+        >
+          👥 Student Registry
+        </button>
+      </div>
+
+      {activeTab === "students" ? (
+        <StudentsPage />
+      ) : electionState.id === 0 ? (
         // ----------------------------------------------------
         // STATE 1: SETUP MODE (No Active Election)
         // ----------------------------------------------------
@@ -299,10 +317,7 @@ export default function AdminPage() {
           </div>
         </div>
       ) : (
-        // ----------------------------------------------------
-        // STATE 2: ACTIVE ELECTION DASHBOARD
-        // ----------------------------------------------------
-        <div className="active-mode">
+          <div className="active-mode">
           
           {/* Live Dashboard Header */}
           <div className="card" style={{ marginBottom: 24, borderLeft: electionState.active ? "4px solid #10B981" : "4px solid #EF4444" }}>
@@ -402,61 +417,71 @@ export default function AdminPage() {
               
               {/* Dynamic Action Card based on Election State */}
               {!electionState.active ? (
-                <div className="card" style={{ borderTop: "4px solid #10B981" }}>
-                  <div className="card-header"><span className="card-title">Start Next Election</span></div>
-                  <div className="card-body">
-                    <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 16, lineHeight: 1.5 }}>
+                <div className="card" style={{ borderTop: "4px solid var(--success)", boxShadow: "var(--shadow-md)" }}>
+                  <div className="card-header" style={{ padding: "20px 24px", borderBottom: "1px solid var(--border-light)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ fontSize: "20px" }}>🚀</span>
+                      <span className="card-title" style={{ fontSize: "16px", fontWeight: "700" }}>Start Next Election</span>
+                    </div>
+                  </div>
+                  <div className="card-body" style={{ padding: "24px" }}>
+                    <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "24px", lineHeight: "1.6" }}>
                       The previous election has ended. You can now initialize a new election instance on the blockchain.
                     </p>
-                    <form onSubmit={handleCreateElection} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <form onSubmit={handleCreateElection} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
                       <div>
-                        <label className="form-label" style={{ fontSize: 12 }}>Election Title / Name</label>
-                        <input type="text" className="form-input" value={newElectionName} onChange={e => setNewElectionName(e.target.value)} required disabled={loading} placeholder="e.g. 2026 SUG Election" />
+                        <label className="form-label" style={{ fontSize: "13px", fontWeight: "600", color: "var(--text-primary)" }}>Election Title / Name</label>
+                        <input type="text" className="form-input" value={newElectionName} onChange={e => setNewElectionName(e.target.value)} required disabled={loading} placeholder="e.g. 2026 SUG Election" style={{ padding: "12px 16px", fontSize: "15px" }} />
                       </div>
-                      <div style={{ display: "flex", gap: 12 }}>
-                        <div style={{ flex: 1 }}>
-                          <label className="form-label" style={{ fontSize: 12 }}>ID (Auto)</label>
-                          <input type="number" className="form-input" value={newElectionId} onChange={e => setNewElectionId(e.target.value)} required disabled={loading} />
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                        <div>
+                          <label className="form-label" style={{ fontSize: "13px", fontWeight: "600" }}>Election ID (Auto)</label>
+                          <input type="number" className="form-input" value={newElectionId} onChange={e => setNewElectionId(e.target.value)} required disabled={loading} style={{ padding: "12px 16px", fontSize: "15px", backgroundColor: "var(--bg-hover)" }} />
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <label className="form-label" style={{ fontSize: 12 }}>Duration (Hrs)</label>
-                          <input type="number" className="form-input" value={durationHours} onChange={e => setDurationHours(e.target.value)} required disabled={loading} min="1" />
+                        <div>
+                          <label className="form-label" style={{ fontSize: "13px", fontWeight: "600" }}>Duration (Hours)</label>
+                          <input type="number" className="form-input" value={durationHours} onChange={e => setDurationHours(e.target.value)} required disabled={loading} min="1" style={{ padding: "12px 16px", fontSize: "15px" }} />
                         </div>
                       </div>
-                      <button type="submit" className="btn btn-primary btn-block" style={{ marginTop: 8 }} disabled={loading || !newElectionId || !newElectionName}>
-                        {loading ? "Initializing..." : "🚀 Start New Election"}
+                      <button type="submit" className="btn btn-primary btn-block" style={{ marginTop: "12px", padding: "14px", fontSize: "15px", fontWeight: "700", borderRadius: "8px", backgroundImage: "linear-gradient(to right, var(--accent), var(--accent-hover))", border: "none", boxShadow: "0 4px 12px rgba(37,99,235,0.3)" }} disabled={loading || !newElectionId || !newElectionName}>
+                        {loading ? "Initializing Blockchain..." : "Launch New Election"}
                       </button>
                     </form>
                   </div>
                 </div>
               ) : (
-                <div className="card" style={{ borderTop: "4px solid #F59E0B" }}>
-                  <div className="card-header"><span className="card-title">Step 3: Add Candidate</span></div>
-                  <div className="card-body">
-                    <form onSubmit={handleAddCandidate} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div className="card" style={{ borderTop: "4px solid var(--warning)", boxShadow: "var(--shadow-md)" }}>
+                  <div className="card-header" style={{ padding: "20px 24px", borderBottom: "1px solid var(--border-light)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ fontSize: "20px" }}>➕</span>
+                      <span className="card-title" style={{ fontSize: "16px", fontWeight: "700" }}>Register Candidate</span>
+                    </div>
+                  </div>
+                  <div className="card-body" style={{ padding: "24px" }}>
+                    <form onSubmit={handleAddCandidate} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
                       <div>
-                        <label className="form-label" style={{ fontSize: 12 }}>Candidate ID (Auto)</label>
-                        <input type="number" className="form-input" value={candidateId} onChange={e => setCandidateId(e.target.value)} required disabled={loading} />
+                        <label className="form-label" style={{ fontSize: "13px", fontWeight: "600" }}>Candidate ID (Auto)</label>
+                        <input type="number" className="form-input" value={candidateId} onChange={e => setCandidateId(e.target.value)} required disabled={loading} style={{ padding: "12px 16px", fontSize: "15px", backgroundColor: "var(--bg-hover)" }} />
                       </div>
                       <div>
-                        <label className="form-label" style={{ fontSize: 12 }}>Full Name</label>
-                        <input type="text" className="form-input" value={candidateName} onChange={e => setCandidateName(e.target.value)} required disabled={loading} placeholder="Jane Doe" />
+                        <label className="form-label" style={{ fontSize: "13px", fontWeight: "600" }}>Full Name</label>
+                        <input type="text" className="form-input" value={candidateName} onChange={e => setCandidateName(e.target.value)} required disabled={loading} placeholder="e.g. Jane Doe" style={{ padding: "12px 16px", fontSize: "15px" }} />
                       </div>
                       <div>
-                        <label className="form-label" style={{ fontSize: 12 }}>Party / Affiliation</label>
-                        <input type="text" className="form-input" value={candidateParty} onChange={e => setCandidateParty(e.target.value)} required disabled={loading} placeholder="Progressive Party" />
+                        <label className="form-label" style={{ fontSize: "13px", fontWeight: "600" }}>Party / Affiliation</label>
+                        <input type="text" className="form-input" value={candidateParty} onChange={e => setCandidateParty(e.target.value)} required disabled={loading} placeholder="e.g. Progressive Party" style={{ padding: "12px 16px", fontSize: "15px" }} />
                       </div>
                       <div>
-                        <label className="form-label" style={{ fontSize: 12 }}>Post / Office</label>
-                        <select className="form-input" value={candidatePost} onChange={e => setCandidatePost(e.target.value)} required disabled={loading}>
+                        <label className="form-label" style={{ fontSize: "13px", fontWeight: "600" }}>Post / Office</label>
+                        <select className="form-input" value={candidatePost} onChange={e => setCandidatePost(e.target.value)} required disabled={loading} style={{ padding: "12px 16px", fontSize: "15px", cursor: "pointer" }}>
                           <option value="President">President</option>
                           <option value="Vice President">Vice President</option>
                           <option value="Secretary">Secretary</option>
                           <option value="Treasurer">Treasurer</option>
                         </select>
                       </div>
-                      <button type="submit" className="btn btn-primary btn-block" style={{ marginTop: 8 }} disabled={loading || !candidateId || !candidateName}>
-                        {loading ? "Adding..." : "➕ Add to Blockchain"}
+                      <button type="submit" className="btn btn-primary btn-block" style={{ marginTop: "12px", padding: "14px", fontSize: "15px", fontWeight: "700", borderRadius: "8px", backgroundColor: "#1e293b", border: "none", color: "#f8fafc" }} disabled={loading || !candidateId || !candidateName}>
+                        {loading ? "Processing..." : "Add to Blockchain"}
                       </button>
                     </form>
                   </div>
@@ -464,22 +489,24 @@ export default function AdminPage() {
               )}
 
               {/* Auxiliary Actions */}
-              <div className="card">
-                <div className="card-header"><span className="card-title">Auxiliary Actions</span></div>
-                <div className="card-body">
-                  <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12, lineHeight: 1.5 }}>
-                    If you enroll new students while the election is active, you can sync the updated whitelist here.
+              <div className="card" style={{ background: "linear-gradient(135deg, #1e293b, #0f172a)", color: "#fff", border: "none", boxShadow: "var(--shadow-md)" }}>
+                <div className="card-header" style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", padding: "16px 24px" }}>
+                  <span className="card-title" style={{ color: "#fff", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span>🔄</span> Sync Whitelist
+                  </span>
+                </div>
+                <div className="card-body" style={{ padding: "24px" }}>
+                  <p style={{ fontSize: "13px", color: "#94a3b8", marginBottom: "20px", lineHeight: "1.6" }}>
+                    If you enroll new students while the election is active, you must sync the updated whitelist to the Ethereum Blockchain for their Zero-Knowledge proofs to be accepted.
                   </p>
-                  <button className="btn btn-secondary btn-block" onClick={handleSyncCommitments} disabled={loading || electionState.unsyncedCount === 0}>
+                  <button className="btn btn-block" style={{ backgroundColor: electionState.unsyncedCount === 0 ? "rgba(255,255,255,0.1)" : "#3b82f6", color: "#fff", border: "none", padding: "12px", fontWeight: "600", borderRadius: "8px", transition: "all 0.2s ease" }} onClick={handleSyncCommitments} disabled={loading || electionState.unsyncedCount === 0}>
                     {electionState.unsyncedCount === 0 ? "✅ Whitelist Up to Date" : `Sync ${electionState.unsyncedCount} New Entries`}
                   </button>
-                  
                 </div>
               </div>
-
             </div>
           </div>
-        </div>
+          </div>
       )}
     </div>
   );

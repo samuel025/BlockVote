@@ -72,21 +72,21 @@ function seed() {
   `);
 
   const students = [
-    ["FUO/21/CSC/001", "Adebayo Oluwaseun", 1, "Computer Science", "Science", 400, "ACTIVE", 2021, "adebayo.o@fuo.edu.ng"],
-    ["FUO/21/CSC/002", "Fatima Bello", 1, "Computer Science", "Science", 400, "ACTIVE", 2021, "fatima.b@fuo.edu.ng"],
-    ["FUO/21/CSC/003", "Chukwuemeka Obi", 1, "Computer Science", "Science", 400, "ACTIVE", 2021, "chukwuemeka.o@fuo.edu.ng"],
-    ["FUO/22/EEE/001", "Amina Yusuf", 2, "Electrical Engineering", "Engineering", 300, "ACTIVE", 2022, "amina.y@fuo.edu.ng"],
-    ["FUO/22/EEE/002", "David Okonkwo", 2, "Electrical Engineering", "Engineering", 300, "ACTIVE", 2022, "david.o@fuo.edu.ng"],
-    ["FUO/22/BUS/001", "Grace Adeyemi", 3, "Business Administration", "Management Sciences", 300, "ACTIVE", 2022, "grace.a@fuo.edu.ng"],
-    ["FUO/23/BIO/001", "Ibrahim Musa", 4, "Biology", "Science", 200, "ACTIVE", 2023, "ibrahim.m@fuo.edu.ng"],
-    ["FUO/20/CSC/001", "Blessing Eze", 1, "Computer Science", "Science", 500, "GRADUATED", 2020, "blessing.e@fuo.edu.ng"],
-    ["FUO/21/LAW/001", "Tunde Bakare", 5, "Law", "Law", 400, "SUSPENDED", 2021, "tunde.b@fuo.edu.ng"],
-    ["FUO/23/MED/001", "Ngozi Onyeka", 6, "Medicine", "Health Sciences", 200, "ACTIVE", 2023, "ngozi.o@fuo.edu.ng"],
-    ["FUO/21/PHY/001", "Samuel Adetola", 7, "Physics", "Science", 400, "ACTIVE", 2021, "samuel.a@fuo.edu.ng"],
-    ["FUO/22/CHM/001", "Halima Abdullahi", 8, "Chemistry", "Science", 300, "ACTIVE", 2022, "halima.a@fuo.edu.ng"],
-    ["FUO/23/ECO/001", "Peter Okafor", 9, "Economics", "Social Sciences", 200, "ACTIVE", 2023, "peter.o@fuo.edu.ng"],
-    ["FUO/21/MAT/001", "Esther Adeniyi", 10, "Mathematics", "Science", 400, "ACTIVE", 2021, "esther.a@fuo.edu.ng"],
-    ["FUO/22/ACC/001", "Mohammed Aliyu", 11, "Accounting", "Management Sciences", 300, "ACTIVE", 2022, "mohammed.a@fuo.edu.ng"],
+    ["2021/1/81878CT", "Samuel Adetola", 1, "Computer Science", "SICT", 400, "ACTIVE", 2021, "samuel.a@st.futminna.edu.ng"],
+    ["2021/1/81879CT", "Fatima Bello", 1, "Computer Science", "SICT", 400, "ACTIVE", 2021, "fatima.b@st.futminna.edu.ng"],
+    ["2021/1/81880CT", "Chukwuemeka Obi", 1, "Computer Science", "SICT", 400, "ACTIVE", 2021, "chukwuemeka.o@st.futminna.edu.ng"],
+    ["2022/1/92001EE", "Amina Yusuf", 2, "Electrical Engineering", "SEET", 300, "ACTIVE", 2022, "amina.y@st.futminna.edu.ng"],
+    ["2022/1/92002EE", "David Okonkwo", 2, "Electrical Engineering", "SEET", 300, "ACTIVE", 2022, "david.o@st.futminna.edu.ng"],
+    ["2022/2/73001BA", "Grace Adeyemi", 3, "Business Administration", "SIT", 300, "ACTIVE", 2022, "grace.a@st.futminna.edu.ng"],
+    ["2023/1/64001MC", "Ibrahim Musa", 4, "Mechatronics Engineering", "SEET", 200, "ACTIVE", 2023, "ibrahim.m@st.futminna.edu.ng"],
+    ["2020/1/51001CT", "Blessing Eze", 1, "Computer Science", "SICT", 500, "GRADUATED", 2020, "blessing.e@st.futminna.edu.ng"],
+    ["2021/2/42001AR", "Tunde Bakare", 5, "Architecture", "SET", 400, "SUSPENDED", 2021, "tunde.b@st.futminna.edu.ng"],
+    ["2023/1/33001CV", "Ngozi Onyeka", 6, "Civil Engineering", "SEET", 200, "ACTIVE", 2023, "ngozi.o@st.futminna.edu.ng"],
+    ["2021/1/81881CT", "Adebayo Oluwaseun", 1, "Computer Science", "SICT", 400, "ACTIVE", 2021, "adebayo.o@st.futminna.edu.ng"],
+    ["2022/1/22001CH", "Halima Abdullahi", 8, "Chemical Engineering", "SEET", 300, "ACTIVE", 2022, "halima.a@st.futminna.edu.ng"],
+    ["2023/2/11001EC", "Peter Okafor", 9, "Economics", "SET", 200, "ACTIVE", 2023, "peter.o@st.futminna.edu.ng"],
+    ["2021/1/81882CT", "Esther Adeniyi", 1, "Computer Science", "SICT", 400, "ACTIVE", 2021, "esther.a@st.futminna.edu.ng"],
+    ["2022/2/00001AC", "Mohammed Aliyu", 11, "Accounting", "SIT", 300, "ACTIVE", 2022, "mohammed.a@st.futminna.edu.ng"],
   ];
 
   const insertMany = db.transaction((students) => {

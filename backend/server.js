@@ -21,7 +21,7 @@ require("dotenv").config({ path: path.join(__dirname, "../.env") });
 const fs = require("fs");
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 
 // -------------------------------------------------------
 // Middleware
@@ -323,6 +323,97 @@ app.post("/api/relay-vote", async (req, res) => {
     res.json({ success: true, txHash: voteTx.hash });
   } catch (err) {
     console.error("Relay Vote Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -------------------------------------------------------
+// Admin Relayer Endpoints (Protected by ADMIN_SECRET_KEY)
+// -------------------------------------------------------
+const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY || "1234";
+
+function requireAdminAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || authHeader !== `Bearer ${ADMIN_SECRET_KEY}`) {
+    return res.status(401).json({ error: "Unauthorized. Invalid Admin PIN." });
+  }
+  next();
+}
+
+async function getAdminSigner() {
+  const rpcUrl = process.env.SEPOLIA_RPC_URL || "http://127.0.0.1:8545";
+  const provider = new ethers.JsonRpcProvider(rpcUrl);
+  if (process.env.PRIVATE_KEY) {
+    return new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+  }
+  return await provider.getSigner(0);
+}
+
+function getContracts(signer) {
+  const deployment = JSON.parse(fs.readFileSync(path.join(__dirname, "../deployment.json"), "utf8"));
+  const votingAbi = JSON.parse(fs.readFileSync(path.join(__dirname, "../artifacts/contracts/Voting.sol/Voting.json"), "utf8")).abi;
+  const eligAbi = JSON.parse(fs.readFileSync(path.join(__dirname, "../artifacts/contracts/VoterEligibility.sol/VoterEligibility.json"), "utf8")).abi;
+  
+  return {
+    voting: new ethers.Contract(deployment.contracts.Voting, votingAbi, signer),
+    eligibility: new ethers.Contract(deployment.contracts.VoterEligibility, eligAbi, signer)
+  };
+}
+
+app.post("/api/relay/admin/end-election", requireAdminAuth, async (req, res) => {
+  try {
+    const signer = await getAdminSigner();
+    const { voting } = getContracts(signer);
+    const tx = await voting.endElection();
+    await tx.wait();
+    res.json({ success: true, txHash: tx.hash });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/relay/admin/sync-commitments", requireAdminAuth, async (req, res) => {
+  try {
+    const { commitments } = req.body;
+    const signer = await getAdminSigner();
+    const { eligibility } = getContracts(signer);
+    const tx = await eligibility.addEnrollmentCommitments(commitments);
+    await tx.wait();
+    res.json({ success: true, txHash: tx.hash });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/relay/admin/create-election", requireAdminAuth, async (req, res) => {
+  try {
+    const { electionId, title, now, endTime } = req.body;
+    const signer = await getAdminSigner();
+    const { voting, eligibility } = getContracts(signer);
+    
+    // First eligibility
+    let tx = await eligibility.createElection(electionId);
+    await tx.wait();
+    
+    // Then voting
+    tx = await voting.initializeElection(electionId, title, now, endTime);
+    await tx.wait();
+    
+    res.json({ success: true, txHash: tx.hash });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/relay/admin/add-candidate", requireAdminAuth, async (req, res) => {
+  try {
+    const { candidateId, name, party, post } = req.body;
+    const signer = await getAdminSigner();
+    const { voting } = getContracts(signer);
+    const tx = await voting.addCandidate(candidateId, name, party, post);
+    await tx.wait();
+    res.json({ success: true, txHash: tx.hash });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

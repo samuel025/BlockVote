@@ -9,6 +9,7 @@ import VotePage from "./pages/VotePage";
 import ResultsPage from "./pages/ResultsPage";
 import StudentsPage from "./pages/StudentsPage";
 import AdminPage from "./pages/AdminPage";
+import AdminAuth from "./components/AdminAuth";
 
 const PAGE_TITLES = {
   "/": { title: "Dashboard", subtitle: "Election overview and system status" },
@@ -72,8 +73,8 @@ export default function App() {
               <Route path="/enroll" element={<EnrollPage />} />
               <Route path="/vote" element={<VotePage />} />
               <Route path="/results" element={<ResultsPage />} />
-              <Route path="/students" element={<StudentsPage />} />
-              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/students" element={<AdminAuth><StudentsPage /></AdminAuth>} />
+              <Route path="/admin" element={<AdminAuth><AdminPage /></AdminAuth>} />
               <Route path="*" element={
                 <div className="empty-state">
                   <div className="empty-state-icon">404</div>

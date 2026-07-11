@@ -7,11 +7,6 @@ const NAV_ITEMS = [
   { to: "/results", icon: "📊", label: "Live Results" },
 ];
 
-const ADMIN_ITEMS = [
-  { to: "/students", icon: "👥", label: "Student Registry" },
-  { to: "/admin", icon: "⚙️", label: "Admin Panel" },
-];
-
 export default function Sidebar({ isOpen, onClose, backendOnline }) {
   const location = useLocation();
 
@@ -36,19 +31,6 @@ export default function Sidebar({ isOpen, onClose, backendOnline }) {
               key={item.to}
               to={item.to}
               end={item.to === "/"}
-              className={({ isActive }) => `sidebar-link ${isActive ? "active" : ""}`}
-              onClick={onClose}
-            >
-              <span>{item.icon}</span>
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
-
-          <div className="sidebar-section-label">Administration</div>
-          {ADMIN_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
               className={({ isActive }) => `sidebar-link ${isActive ? "active" : ""}`}
               onClick={onClose}
             >

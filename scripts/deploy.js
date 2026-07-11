@@ -11,7 +11,7 @@
  * Then initializes the election with test candidates and enrollment commitments.
  */
 
-const { ethers } = require("hardhat");
+const { ethers, network } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
@@ -83,8 +83,8 @@ async function main() {
   // Save deployment addresses (Blank Election State)
   // -------------------------------------------------------
   const deployment = {
-    network: "localhost",
-    chainId: 1337,
+    network: network.name,
+    chainId: network.config.chainId || (network.name === "sepolia" ? 11155111 : 1337),
     admin: admin.address,
     contracts: {
       Verifier: verifierAddr,
