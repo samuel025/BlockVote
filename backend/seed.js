@@ -40,7 +40,6 @@ function seed() {
     CREATE TABLE IF NOT EXISTS did_mappings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       matric_number TEXT UNIQUE NOT NULL,
-      did_hash TEXT NOT NULL,
       enrollment_commitment TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (matric_number) REFERENCES students(matric_number)

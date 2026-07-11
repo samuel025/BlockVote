@@ -2,10 +2,7 @@ node_modules
 .env
 *.env
 .circom-build
-artifacts/
+
 cache/
 frontend/dist/
-backend/university.db
-backend/university.db-wal
-backend/university.db-shm
 .DS_Store
