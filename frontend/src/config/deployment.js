@@ -14,7 +14,7 @@ export const DEPLOYMENT = {
   rpcUrl: DEPLOYMENT_DATA.network === "sepolia" 
     ? "https://eth-sepolia.g.alchemy.com/v2/tY8GECciPef-u_ATg_PtY"
     : `http://${host}:8545`,
-  apiUrl: `http://${host}:3002`,
+  apiUrl: "https://blockvote-if76.onrender.com"
 };
 
 export const VOTING_ABI = [
