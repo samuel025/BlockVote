@@ -310,7 +310,7 @@ export default function VotePage() {
                     <div style={{ color: "var(--text-secondary)", fontSize: 12, marginBottom: 12, fontWeight: 600 }}>Verify on Blockchain</div>
                     <div style={{ display: "inline-block", padding: 12, background: "white", borderRadius: 8, border: "1px solid var(--border)" }}>
                       <QRCodeSVG 
-                        value={`https://sepolia.etherscan.io/tx/${txHash}`} 
+                        value={DEPLOYMENT.network === "arbitrumSepolia" ? `https://sepolia.arbiscan.io/tx/${txHash}` : `https://sepolia.etherscan.io/tx/${txHash}`} 
                         size={150}
                         bgColor={"#ffffff"}
                         fgColor={"#000000"}
@@ -318,8 +318,8 @@ export default function VotePage() {
                       />
                     </div>
                     <div style={{ marginTop: 12 }}>
-                      <a href={`https://sepolia.etherscan.io/tx/${txHash}`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none", fontWeight: 600 }}>
-                        View on Sepolia Etherscan ↗
+                      <a href={DEPLOYMENT.network === "arbitrumSepolia" ? `https://sepolia.arbiscan.io/tx/${txHash}` : `https://sepolia.etherscan.io/tx/${txHash}`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none", fontWeight: 600 }}>
+                        View on {DEPLOYMENT.network === "arbitrumSepolia" ? "Arbiscan" : "Etherscan"} ↗
                       </a>
                     </div>
                   </div>
