@@ -11,7 +11,9 @@ const host = typeof window !== 'undefined' ? window.location.hostname : '127.0.0
 
 export const DEPLOYMENT = {
   ...DEPLOYMENT_DATA,
-  rpcUrl: DEPLOYMENT_DATA.network === "sepolia" 
+  rpcUrl: DEPLOYMENT_DATA.network === "arbitrumSepolia" 
+    ? "https://arb-sepolia.g.alchemy.com/v2/tY8GECciPef-u_ATg_PtY"
+    : DEPLOYMENT_DATA.network === "sepolia"
     ? "https://eth-sepolia.g.alchemy.com/v2/tY8GECciPef-u_ATg_PtY"
     : `http://${host}:8545`,
   apiUrl: "https://blockvote-if76.onrender.com"
