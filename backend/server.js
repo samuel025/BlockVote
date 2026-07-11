@@ -139,27 +139,16 @@ app.post("/api/enroll", async (req, res) => {
     if (existing) {
       return res.json({
         message: "Student already enrolled",
-        didHash: existing.did_hash,
         enrollmentCommitment: existing.enrollment_commitment,
       });
     }
 
-    const p = await getPoseidon();
-
-    // Generate field elements
-    const matricField = matricToFieldElement(matricNumber);
-
-    // Compute DID hash: Poseidon(matricField)
-    const didRaw = p([matricField]);
-    const didHash = p.F.toString(didRaw);
-
     // Store mapping
     db.prepare(
-      `INSERT INTO did_mappings (matric_number, did_hash, enrollment_commitment)
-       VALUES (?, ?, ?)`
+      `INSERT INTO did_mappings (matric_number, enrollment_commitment)
+       VALUES (?, ?)`
     ).run(
       matricNumber,
-      didHash,
       enrollmentCommitment
     );
 
@@ -170,7 +159,6 @@ app.post("/api/enroll", async (req, res) => {
         department: student.department_name,
         level: student.level,
       },
-      didHash,
       enrollmentCommitment,
     });
   } catch (err) {
@@ -233,7 +221,6 @@ app.post("/api/verify", async (req, res) => {
 
     res.json({
       eligible: true,
-      didHash: mapping.did_hash,
       enrollmentCommitment: mapping.enrollment_commitment,
       nullifierHash,
       student: {
@@ -270,7 +257,7 @@ app.get("/api/election/:id", (req, res) => {
  */
 app.get("/api/enrollment-commitments", (req, res) => {
   const mappings = db
-    .prepare("SELECT matric_number, did_hash, enrollment_commitment FROM did_mappings")
+    .prepare("SELECT matric_number, enrollment_commitment FROM did_mappings")
     .all();
   res.json({ commitments: mappings });
 });
@@ -280,8 +267,8 @@ app.get("/api/enrollment-commitments", (req, res) => {
 // -------------------------------------------------------
 app.post("/api/relay-vote", async (req, res) => {
   try {
-    const { didHash, candidateIds, calldataStr } = req.body;
-    if (!didHash || !candidateIds || !Array.isArray(candidateIds) || !calldataStr) {
+    const { ephemeralDid, candidateIds, calldataStr } = req.body;
+    if (!ephemeralDid || !candidateIds || !Array.isArray(candidateIds) || !calldataStr) {
       return res.status(400).json({ error: "Missing or invalid required parameters" });
     }
 
@@ -302,9 +289,9 @@ app.post("/api/relay-vote", async (req, res) => {
     const eligibility = new ethers.Contract(deployment.contracts.VoterEligibility, eligibilityAbi, signer);
     const voting = new ethers.Contract(deployment.contracts.Voting, votingAbi, signer);
 
-    const bytes32Did = didHash.startsWith("0x")
-      ? ethers.zeroPadValue(ethers.toBeHex(BigInt(didHash.replace("0x", ""), 16)), 32)
-      : ethers.zeroPadValue(ethers.toBeHex(BigInt(didHash)), 32);
+    const bytes32Did = ephemeralDid.startsWith("0x")
+      ? ethers.zeroPadValue(ethers.toBeHex(BigInt(ephemeralDid)), 32)
+      : ethers.zeroPadValue(ethers.toBeHex(BigInt("0x" + ephemeralDid)), 32);
 
     const currentElectionId = await voting.electionId();
     const isElig = await eligibility.isEligible(currentElectionId, bytes32Did);
@@ -313,7 +300,7 @@ app.post("/api/relay-vote", async (req, res) => {
       const args = new Function(`return [${calldataStr}]`)();
       const [pA, pB, pC, pubSignals] = args;
       
-      const verifyTx = await eligibility.verifyAndRegister(pA, pB, pC, pubSignals, bytes32Did);
+      const verifyTx = await eligibility.verifyAndRegister(pA, pB, pC, pubSignals);
       await verifyTx.wait();
     }
 

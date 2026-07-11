@@ -39,6 +39,7 @@ template EligibilityProof() {
     signal input enrollmentCommitment;
     signal input nullifierHash;
     signal input electionId;
+    signal input ephemeralDid;
 
     // -------------------------------------------------------
     // Step 1: Verify the enrollment commitment
@@ -63,6 +64,14 @@ template EligibilityProof() {
 
     // Constrain: the computed nullifier must match the public nullifier hash
     nullifierHasher.out === nullifierHash;
+    // -------------------------------------------------------
+    // Step 3: Bind Ephemeral DID
+    // -------------------------------------------------------
+    // We add a dummy constraint to ensure the compiler doesn't optimize away
+    // the ephemeralDid. This forces the generated verifier smart contract to 
+    // include it in the public signals, binding the proof to this specific DID.
+    signal dummy;
+    dummy <== ephemeralDid * ephemeralDid;
 }
 
-component main {public [enrollmentCommitment, nullifierHash, electionId]} = EligibilityProof();
+component main {public [enrollmentCommitment, nullifierHash, electionId, ephemeralDid]} = EligibilityProof();

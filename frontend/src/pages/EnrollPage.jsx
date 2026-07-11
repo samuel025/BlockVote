@@ -74,7 +74,7 @@ export default function EnrollPage() {
           <strong>Enrollment Process (Kiosk Mode)</strong>
           <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.5 }}>
             Enter your matriculation number and scan your biometric. 
-            The system will generate your Decentralized Identifier (DID) and enrollment commitment locally. 
+            The system will generate your secure Enrollment Commitment locally.
             Your biometric data never leaves this device.
           </div>
         </div>
@@ -125,10 +125,7 @@ export default function EnrollPage() {
               )}
 
               <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                <div className="form-group">
-                  <label className="form-label">DID Hash</label>
-                  <input className="form-input" readOnly value={result.didHash} style={{ fontFamily: "monospace", fontSize: 11 }} />
-                </div>
+
                 <div className="form-group">
                   <label className="form-label">Enrollment Commitment</label>
                   <input className="form-input" readOnly value={result.enrollmentCommitment} style={{ fontFamily: "monospace", fontSize: 11 }} />

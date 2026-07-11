@@ -110,11 +110,11 @@ export async function getElectionTimes() {
 /**
  * Check if a DID has already voted
  */
-export async function hasVoted(electionId, didHash) {
+export async function hasVoted(electionId, nullifierHash) {
   const voting = getVotingContract();
-  const bytes32 = didHash.startsWith("0x")
-    ? ethers.zeroPadValue(ethers.toBeHex(BigInt(didHash.replace("0x", ""), 16)), 32)
-    : ethers.zeroPadValue(ethers.toBeHex(BigInt(didHash)), 32);
+  const bytes32 = nullifierHash.startsWith("0x")
+    ? ethers.zeroPadValue(ethers.toBeHex(BigInt(nullifierHash.replace("0x", ""), 16)), 32)
+    : ethers.zeroPadValue(ethers.toBeHex(BigInt(nullifierHash)), 32);
   return voting.hasVoterVoted(electionId, bytes32);
 }
 
@@ -122,13 +122,13 @@ export async function hasVoted(electionId, didHash) {
  * Cast a vote on-chain via admin signer
  * This handles BOTH the ZKP verification and the voting transaction.
  */
-export async function castVoteOnChain(didHash, candidateIds, calldataStr) {
+export async function castVoteOnChain(ephemeralDid, candidateIds, calldataStr) {
   // Option B: Gasless Backend Relayer
   // We send the vote payload to the backend, which pays the gas and signs the transaction.
   const response = await fetch(`${DEPLOYMENT.apiUrl}/api/relay-vote`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ didHash, candidateIds, calldataStr })
+    body: JSON.stringify({ ephemeralDid, candidateIds, calldataStr })
   });
 
   if (!response.ok) {

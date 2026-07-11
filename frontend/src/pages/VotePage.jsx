@@ -50,6 +50,11 @@ export default function VotePage() {
       // Local ZKP Generation on the Pi
       toast.info("Generating Zero-Knowledge Proof locally...");
       
+      // Generate Ephemeral DID for absolute privacy (Secret Ballot)
+      // 31 bytes ensures the value is strictly less than the BN128 scalar field prime
+      const ephemeralDidHex = "0x" + Array.from(crypto.getRandomValues(new Uint8Array(31))).map(b => b.toString(16).padStart(2, '0')).join('');
+      const ephemeralDidField = BigInt(ephemeralDidHex).toString();
+
       const circuitInput = {
         matricNumber: matricToFieldElement(cleanMatric).toString(),
         departmentId: data.student.departmentId.toString(),
@@ -57,6 +62,7 @@ export default function VotePage() {
         enrollmentCommitment: data.enrollmentCommitment,
         nullifierHash: data.nullifierHash,
         electionId: eId.toString(),
+        ephemeralDid: ephemeralDidField
       };
 
       const { proof, publicSignals } = await snarkjs.groth16.fullProve(
@@ -71,7 +77,7 @@ export default function VotePage() {
       
       setActiveElectionId(eId);
       setCandidates(liveCandidates);
-      setVerifyResult({ ...data, calldata });
+      setVerifyResult({ ...data, calldata, ephemeralDid: ephemeralDidHex });
       setStep(1);
       toast.success(`Identity verified — Welcome, ${data.student?.name || "Student"}`);
     } catch (err) {
@@ -102,7 +108,7 @@ export default function VotePage() {
 
     try {
       const candidateIds = Object.values(selectedCandidates);
-      const { tx } = await castVoteOnChain(verifyResult.didHash, candidateIds, verifyResult.calldata);
+      const { tx } = await castVoteOnChain(verifyResult.ephemeralDid, candidateIds, verifyResult.calldata);
       setTxHash(tx.hash);
       setVoteSuccess(true);
       setStep(3);

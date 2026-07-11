@@ -138,7 +138,7 @@ export default function StudentsPage() {
                         </td>
                         <td>
                           {isEnrolled ? (
-                            <span className="badge badge-inactive" style={{ background: "var(--success-light)", color: "var(--success)" }}>✓ DID Generated</span>
+                            <span className="badge badge-inactive" style={{ background: "var(--success-light)", color: "var(--success)" }}>✓ Enrolled</span>
                           ) : (
                             <span className="badge badge-inactive">Pending</span>
                           )}

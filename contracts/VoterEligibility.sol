@@ -10,7 +10,7 @@ interface IGroth16Verifier {
         uint256[2] calldata _pA,
         uint256[2][2] calldata _pB,
         uint256[2] calldata _pC,
-        uint256[3] calldata _pubSignals
+        uint256[4] calldata _pubSignals
     ) external view returns (bool);
 }
 
@@ -129,8 +129,7 @@ contract VoterEligibility {
      * @param _pA       Groth16 proof point A
      * @param _pB       Groth16 proof point B
      * @param _pC       Groth16 proof point C
-     * @param _pubSignals Public signals: [enrollmentCommitment, nullifierHash, electionId]
-     * @param _didHash  Hash of the student's Decentralised Identifier
+     * @param _pubSignals Public signals: [enrollmentCommitment, nullifierHash, electionId, ephemeralDid]
      *
      * @dev The proof demonstrates:
      *   1. The prover knows (matricNumber, departmentId, enrollmentSecret) whose
@@ -141,13 +140,13 @@ contract VoterEligibility {
         uint256[2] calldata _pA,
         uint256[2][2] calldata _pB,
         uint256[2] calldata _pC,
-        uint256[3] calldata _pubSignals,
-        bytes32 _didHash
+        uint256[4] calldata _pubSignals
     ) external {
         // Extract public signals
         bytes32 enrollmentCommitment = bytes32(_pubSignals[0]);
         bytes32 nullifierHash = bytes32(_pubSignals[1]);
         uint256 electionId = _pubSignals[2];
+        bytes32 ephemeralDid = bytes32(_pubSignals[3]);
 
         // Validate election context
         require(electionId == currentElectionId, "VoterEligibility: wrong election ID");
@@ -162,18 +161,19 @@ contract VoterEligibility {
         require(!usedNullifiers[nullifierHash], "VoterEligibility: already registered");
 
         // Prevent re-registration of the same DID for this election
-        require(!eligibleVoters[electionId][_didHash], "VoterEligibility: DID already eligible");
+        require(!eligibleVoters[electionId][ephemeralDid], "VoterEligibility: DID already eligible");
 
         // Verify the zk-SNARK proof on-chain
         bool proofValid = verifier.verifyProof(_pA, _pB, _pC, _pubSignals);
         require(proofValid, "VoterEligibility: invalid proof");
 
         // Mark nullifier as used and DID as eligible for this election
+        // Register the Ephemeral DID as an eligible voter for this election
         usedNullifiers[nullifierHash] = true;
-        eligibleVoters[electionId][_didHash] = true;
+        eligibleVoters[electionId][ephemeralDid] = true;
         eligibleVoterCount++;
 
-        emit VoterVerified(_didHash, nullifierHash);
+        emit VoterVerified(ephemeralDid, nullifierHash);
     }
 
     // -------------------------------------------------------

@@ -1,13 +1,13 @@
 {
-  "network": "localhost",
-  "chainId": 1337,
-  "admin": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "network": "sepolia",
+  "chainId": 11155111,
+  "admin": "0x4ba28AAeD3cd57bF2CbCa3b2232a8B68bc7fb619",
   "contracts": {
-    "Verifier": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-    "VoterEligibility": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-    "Voting": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-    "SmartAccountFactory": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-    "VotingPaymaster": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+    "Verifier": "0xB84D913820321C836731952D66329AC3171Fb89b",
+    "VoterEligibility": "0x59330eeb4435486C1D6393685CaEadF5160575C1",
+    "Voting": "0x10c7FA4E0B02698E537f90421677b5520046F53b",
+    "SmartAccountFactory": "0x67A2785067E3a9189471B3d015FdBa36Ceda61d6",
+    "VotingPaymaster": "0x3Bd091790775fb00773b9e983F17DcfB1Db53547"
   },
   "election": {
     "id": 0,
@@ -15,5 +15,5 @@
     "endTime": 0,
     "candidates": []
   },
-  "deployedAt": "2026-07-10T13:52:24.915Z"
+  "deployedAt": "2026-07-11T13:29:01.588Z"
 }

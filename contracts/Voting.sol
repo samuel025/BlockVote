@@ -48,7 +48,7 @@ contract Voting {
 
     event ElectionInitialized(uint256 indexed electionId, string name, uint256 startTime, uint256 endTime);
     event CandidateAdded(uint256 indexed electionId, uint256 indexed candidateId, string name, string party, string post);
-    event VoteCast(uint256 indexed electionId, bytes32 indexed didHash, uint256[] candidateIds);
+    event VoteCast(uint256 indexed electionId, bytes32 indexed ephemeralDid, uint256[] candidateIds);
     event ElectionEnded(uint256 indexed electionId, uint256 totalVotes);
 
     // -------------------------------------------------------
@@ -128,12 +128,12 @@ contract Voting {
     // Voting
     // -------------------------------------------------------
 
-    function castVote(bytes32 _didHash, uint256[] calldata _candidateIds) external whenElectionActive nonReentrant {
-        require(eligibilityContract.isEligible(electionId, _didHash), "Voting: voter is not eligible");
-        require(!hasVoted[electionId][_didHash], "Voting: already voted");
+    function castVote(bytes32 _ephemeralDid, uint256[] calldata _candidateIds) external whenElectionActive nonReentrant {
+        require(eligibilityContract.isEligible(electionId, _ephemeralDid), "Voting: voter is not eligible");
+        require(!hasVoted[electionId][_ephemeralDid], "Voting: already voted");
         require(_candidateIds.length > 0, "Voting: no candidates selected");
 
-        hasVoted[electionId][_didHash] = true;
+        hasVoted[electionId][_ephemeralDid] = true;
         totalVotesCast[electionId]++;
 
         for (uint256 i = 0; i < _candidateIds.length; i++) {
@@ -142,7 +142,7 @@ contract Voting {
             candidates[electionId][cId].voteCount++;
         }
 
-        emit VoteCast(electionId, _didHash, _candidateIds);
+        emit VoteCast(electionId, _ephemeralDid, _candidateIds);
     }
 
     // -------------------------------------------------------

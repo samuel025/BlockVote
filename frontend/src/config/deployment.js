@@ -12,16 +12,16 @@ const host = typeof window !== 'undefined' ? window.location.hostname : '127.0.0
 export const DEPLOYMENT = {
   ...DEPLOYMENT_DATA,
   rpcUrl: DEPLOYMENT_DATA.network === "sepolia" 
-    ? "https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_API_KEY" // Or import from process.env if using Vite env vars
+    ? "https://eth-sepolia.g.alchemy.com/v2/tY8GECciPef-u_ATg_PtY"
     : `http://${host}:8545`,
-  apiUrl: `http://${host}:3001`,
+  apiUrl: `http://${host}:3002`,
 };
 
 export const VOTING_ABI = [
   "function endElection() external",
   "function initializeElection(uint256 _electionId, string calldata _name, uint256 _startTime, uint256 _endTime) external",
   "function addCandidate(uint256 _candidateId, string calldata _name, string calldata _party, string calldata _post) external",
-  "function castVote(bytes32 _didHash, uint256[] calldata _candidateIds) external",
+  "function castVote(bytes32 _ephemeralDid, uint256[] calldata _candidateIds) external",
   "function electionActive() view returns (bool)",
   "function electionName() view returns (string)",
   "function electionEnd() view returns (uint256)",
@@ -31,15 +31,15 @@ export const VOTING_ABI = [
   "function hasVoterVoted(uint256 _electionId, bytes32 _didHash) view returns (bool)",
   "function totalVotesCast(uint256) view returns (uint256)",
   "function candidateCount(uint256) view returns (uint256)",
-  "event VoteCast(uint256 indexed electionId, bytes32 indexed didHash, uint256[] candidateIds)",
+  "event VoteCast(uint256 indexed electionId, bytes32 indexed ephemeralDid, uint256[] candidateIds)",
   "event ElectionEnded(uint256 indexed electionId, uint256 totalVotes)",
 ];
 
 export const ELIGIBILITY_ABI = [
-  "function verifyAndRegister(uint256[2] calldata _pA, uint256[2][2] calldata _pB, uint256[2] calldata _pC, uint256[3] calldata _pubSignals, bytes32 _didHash) external",
+  "function verifyAndRegister(uint256[2] calldata _pA, uint256[2][2] calldata _pB, uint256[2] calldata _pC, uint256[4] calldata _pubSignals) external",
   "function createElection(uint256 _electionId) external",
   "function addEnrollmentCommitments(bytes32[] calldata _commitments) external",
-  "function isEligible(uint256 _electionId, bytes32 _didHash) view returns (bool)",
+  "function isEligible(uint256 _electionId, bytes32 _ephemeralDid) view returns (bool)",
   "function eligibleVoterCount() view returns (uint256)",
   "function currentElectionId() view returns (uint256)",
   "function enrollmentCommitments(bytes32) view returns (bool)",
