@@ -154,26 +154,31 @@ export default function VotePage() {
               <div style={{ fontSize: 12 }}>Your identity will be verified using zero-knowledge proofs. Your personal details will <strong>not</strong> be linked to your vote.</div>
             </div>
             <div style={{ textAlign: "center", marginBottom: 24 }}>
-              <div style={{ position: "relative", width: 64, height: 64, margin: "0 auto 16px auto", color: isScanning ? "var(--accent)" : "var(--text-tertiary)", transition: "color 0.3s" }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: "100%", height: "100%" }}>
-                  <path d="M2 12C2 12 5 5 12 5C19 5 22 12 22 12" />
-                  <path d="M5 15C5 15 7.5 9 12 9C16.5 9 19 15 19 15" />
-                  <path d="M8 18C8 18 9.5 13 12 13C14.5 13 16 18 16 18" />
-                  <path d="M12 21V17" />
+              <div style={{ 
+                position: "relative", width: 80, height: 80, margin: "0 auto 24px auto", 
+                color: isScanning ? "var(--accent)" : "var(--text-tertiary)", 
+                transition: "all 0.4s ease",
+                filter: isScanning ? "drop-shadow(0 0 15px rgba(37, 99, 235, 0.4))" : "none"
+              }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ width: "100%", height: "100%" }}>
+                  <path d="M2 12C2 12 5 5 12 5c7 0 10 7 10 7"/>
+                  <path d="M5 15C5 15 7.5 9 12 9c4.5 0 7 6 7 6"/>
+                  <path d="M8 18C8 18 9.5 13 12 13c2.5 0 4 5 4 5"/>
+                  <path d="M12 21v-4"/>
                 </svg>
                 {isScanning && (
                   <div style={{
-                    position: "absolute", top: 0, left: 0, width: "100%", height: "3px",
-                    background: "var(--accent)", boxShadow: "0 0 10px var(--accent)", borderRadius: "4px",
-                    animation: "scanLine 1.5s linear infinite"
+                    position: "absolute", top: 0, left: 0, width: "100%", height: "4px",
+                    background: "var(--accent)", boxShadow: "0 0 12px var(--accent)", borderRadius: "4px",
+                    animation: "scanLine 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite"
                   }} />
                 )}
                 <style>{`
                   @keyframes scanLine {
-                    0% { top: 0%; opacity: 0; }
+                    0% { top: -10%; opacity: 0; }
                     10% { opacity: 1; }
                     90% { opacity: 1; }
-                    100% { top: 100%; opacity: 0; }
+                    100% { top: 110%; opacity: 0; }
                   }
                 `}</style>
               </div>

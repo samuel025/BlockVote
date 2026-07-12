@@ -3,11 +3,11 @@
   "chainId": 1337,
   "admin": "0x4ba28AAeD3cd57bF2CbCa3b2232a8B68bc7fb619",
   "contracts": {
-    "Verifier": "0x12CeE21a335Ca733359E1691A3D77896f41C8BED",
-    "VoterEligibility": "0x0eCa9d483c6572ca0a524822C25D268aB98A329E",
-    "Voting": "0xFCB768339773E83dC35f93cB6223e265bbA370d5",
-    "SmartAccountFactory": "0x33f10D629304D29807937032354A9369Af3204b1",
-    "VotingPaymaster": "0x461166De045cd13597293Ac17A2829F175444D3e"
+    "Verifier": "0xEfE81A32E11DBD9BA808161a6200B2489582CA3f",
+    "VoterEligibility": "0xA606d5569BCF4A5b36625B067A46D2213E64da0E",
+    "Voting": "0x3f79Af61Ce7B97CA685C44C49E82B504a843DFb1",
+    "SmartAccountFactory": "0x32b6ac2f6a2e28dE1a428F41738Af8BFbf8f73E4",
+    "VotingPaymaster": "0x7cE7e00142ba797c01C1F18650d506AC975e83E1"
   },
   "election": {
     "id": 0,
@@ -15,5 +15,5 @@
     "endTime": 0,
     "candidates": []
   },
-  "deployedAt": "2026-07-11T21:13:54.372Z"
+  "deployedAt": "2026-07-12T17:27:09.303Z"
 }
