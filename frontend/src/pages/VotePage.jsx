@@ -32,9 +32,16 @@ export default function VotePage() {
     if (!MATRIC_PATTERN.test(cleanMatric)) { setFieldError("Format must be YYYY/X/NNNNNDD (e.g. 2021/1/81878CT)"); return; }
     setFieldError("");
     
-    // Simulate Hardware Biometric Scan (Fingerprint)
-    setIsScanning(true);
-    const fingerprintHash = await verifyFingerprint(cleanMatric);
+    // Hardware Biometric Scan (Fingerprint)
+    let fingerprintHash;
+    try {
+      setIsScanning(true);
+      fingerprintHash = await verifyFingerprint(cleanMatric);
+    } catch (err) {
+      setIsScanning(false);
+      toast.error(err.message || "Hardware biometric scan failed.");
+      return;
+    }
     setIsScanning(false);
 
     setVerifyLoading(true);
