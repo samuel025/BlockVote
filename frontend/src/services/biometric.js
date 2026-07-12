@@ -18,16 +18,15 @@ export function matricToFieldElement(matricNumber) {
 
 /**
  * Connects to the local Raspberry Pi hardware bridge (bridge.py)
- * If the hardware script is not running, falls back to the deterministic mock.
+ * STRICT MODE: Fails immediately if the physical hardware bridge is not running.
  */
 export async function scanFingerprint(matricNumber) {
   try {
-    // 1. Try to talk to the physical JM-101 fingerprint sensor via the local Python bridge
     console.log("Attempting to connect to hardware bridge at http://127.0.0.1:5000/scan...");
     const response = await fetch("http://127.0.0.1:5000/scan", {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(3000) // Don't wait forever if script isn't running
+      signal: AbortSignal.timeout(60000) // Wait up to 60 seconds for a physical scan
     });
     
     if (response.ok) {
@@ -37,15 +36,14 @@ export async function scanFingerprint(matricNumber) {
         // Hash the secret returned from the sensor to generate a ZK-compatible field element
         const hash = ethers.keccak256(ethers.toUtf8Bytes(data.secret));
         return BigInt(hash.slice(0, 64)).toString();
+      } else {
+        throw new Error(data.error || "Hardware returned invalid data");
       }
+    } else {
+      throw new Error(`Hardware Bridge returned HTTP ${response.status}`);
     }
   } catch (err) {
-    console.warn("Hardware bridge not detected on localhost:5000. Falling back to software simulation.");
-    alert("DEVELOPER WARNING:\nCould not connect to the physical fingerprint scanner on the Raspberry Pi (Hardware Bridge not running).\n\nFalling back to software simulation.");
+    console.error("Hardware connection failed:", err);
+    throw new Error("HARDWARE DISCONNECTED: Could not reach the fingerprint scanner on the Raspberry Pi. Ensure bridge.py is running.");
   }
-
-  // 2. Fallback: Software simulation for testing on your laptop without the Pi connected
-  await new Promise((resolve) => setTimeout(resolve, 1500));
-  const hash = ethers.keccak256(ethers.toUtf8Bytes("BIOMETRIC_TEMPLATE:" + matricNumber));
-  return BigInt(hash.slice(0, 64)).toString();
 }
