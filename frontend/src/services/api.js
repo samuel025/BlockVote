@@ -82,4 +82,15 @@ export const api = {
 
   /** Get all enrollment commitments */
   getEnrollmentCommitments: () => request("/api/enrollment-commitments"),
+
+  /** Admin: Revoke enrollment commitment */
+  revokeCommitment: (matricNumber, adminSecret) =>
+    request("/api/relay/admin/revoke-commitment", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${adminSecret}`
+      },
+      body: JSON.stringify({ matricNumber }),
+    }),
 };

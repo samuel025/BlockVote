@@ -17,18 +17,34 @@ export function matricToFieldElement(matricNumber) {
 }
 
 /**
- * Mocks the Raspberry Pi Biometric Scanner
- * In the final hardware implementation, this would call a local Python server (e.g. localhost:5000/scan)
- * to get the hash of the scanned biometric data.
+ * Connects to the local Raspberry Pi hardware bridge (bridge.py)
+ * If the hardware script is not running, falls back to the deterministic mock.
  */
 export async function scanFingerprint(matricNumber) {
-  // Simulate delay of a hardware scan
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  try {
+    // 1. Try to talk to the physical JM-101 fingerprint sensor via the local Python bridge
+    console.log("Attempting to connect to hardware bridge at http://127.0.0.1:5000/scan...");
+    const response = await fetch("http://127.0.0.1:5000/scan", {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(3000) // Don't wait forever if script isn't running
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && data.secret) {
+        console.log("Hardware scan successful!");
+        // Hash the secret returned from the sensor to generate a ZK-compatible field element
+        const hash = ethers.keccak256(ethers.toUtf8Bytes(data.secret));
+        return BigInt(hash.slice(0, 64)).toString();
+      }
+    }
+  } catch (err) {
+    console.warn("Hardware bridge not detected on localhost:5000. Falling back to software simulation.");
+  }
 
-  // For the thesis prototype, we mock the biometric hash based on the matric number
-  // so that the same student always produces the same biometric hash.
+  // 2. Fallback: Software simulation for testing on your laptop without the Pi connected
+  await new Promise((resolve) => setTimeout(resolve, 1500));
   const hash = ethers.keccak256(ethers.toUtf8Bytes("BIOMETRIC_TEMPLATE:" + matricNumber));
-  
-  // Truncate to 31 bytes to fit in BN128 field for snarkjs
   return BigInt(hash.slice(0, 64)).toString();
 }

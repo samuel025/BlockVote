@@ -35,6 +35,16 @@ module.exports = {
     }
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY
+    apiKey: process.env.ETHERSCAN_API_KEY,
+    customChains: [
+      {
+        network: "arbitrumSepolia",
+        chainId: 421614,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api?chainid=421614",
+          browserURL: "https://sepolia.arbiscan.io"
+        }
+      }
+    ]
   }
 };

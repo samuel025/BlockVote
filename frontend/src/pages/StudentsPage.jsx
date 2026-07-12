@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { api } from "../services/api";
+import { useToast } from "../components/Toast";
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
   const [enrolledMatrics, setEnrolledMatrics] = useState(new Set());
   const [loading, setLoading] = useState(true);
+  const toast = useToast();
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
@@ -39,6 +41,19 @@ export default function StudentsPage() {
       setLoading(false);
     }
   }
+  
+  const handleRevoke = async (matricNumber) => {
+    const secret = prompt(`WARNING: You are about to permanently revoke voting access for ${matricNumber}.\n\nEnter Admin Secret Key to confirm:`);
+    if (!secret) return;
+    
+    try {
+      await api.revokeCommitment(matricNumber, secret);
+      toast.success("Enrollment Revoked", `Successfully suspended ${matricNumber}`);
+      loadData(); // Refresh list
+    } catch (err) {
+      toast.error("Revocation Failed", err.message);
+    }
+  };
 
   const filtered = students.filter((s) => {
     const matchSearch = !search || s.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -120,7 +135,7 @@ export default function StudentsPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>Matric Number</th><th>Full Name</th><th>Department</th><th>Status</th><th>Voting Enrollment</th>
+                    <th>Matric Number</th><th>Full Name</th><th>Department</th><th>Status</th><th>Voting Enrollment</th><th style={{textAlign: "right"}}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -141,6 +156,17 @@ export default function StudentsPage() {
                             <span className="badge badge-inactive" style={{ background: "var(--success-light)", color: "var(--success)" }}>✓ Enrolled</span>
                           ) : (
                             <span className="badge badge-inactive">Pending</span>
+                          )}
+                        </td>
+                        <td style={{textAlign: "right"}}>
+                          {isEnrolled && (
+                            <button 
+                              className="btn btn-secondary" 
+                              style={{ padding: "4px 8px", fontSize: 11, color: "var(--danger)", border: "1px solid var(--danger)", background: "transparent" }}
+                              onClick={() => handleRevoke(s.matric_number)}
+                            >
+                              Revoke
+                            </button>
                           )}
                         </td>
                       </tr>

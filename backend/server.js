@@ -406,6 +406,37 @@ app.post("/api/relay/admin/add-candidate", requireAdminAuth, async (req, res) =>
 });
 
 // -------------------------------------------------------
+// Revoke Enrollment Endpoint
+// -------------------------------------------------------
+app.post("/api/relay/admin/revoke-commitment", requireAdminAuth, async (req, res) => {
+  try {
+    const { matricNumber } = req.body;
+    
+    // Find the commitment in the database
+    const mapping = db.prepare("SELECT enrollment_commitment FROM did_mappings WHERE matric_number = ?").get(matricNumber);
+    if (!mapping) {
+      return res.status(404).json({ error: "Student not enrolled" });
+    }
+    
+    // Revoke on-chain
+    const commitmentBytes32 = ethers.zeroPadValue(ethers.toBeHex(BigInt(mapping.enrollment_commitment)), 32);
+    const signer = await getAdminSigner();
+    const { eligibility } = getContracts(signer);
+    
+    const tx = await eligibility.revokeEnrollmentCommitment(commitmentBytes32);
+    await tx.wait();
+    
+    // Update local database
+    db.prepare("UPDATE students SET enrollment_status = 'SUSPENDED' WHERE matric_number = ?").run(matricNumber);
+    db.prepare("DELETE FROM did_mappings WHERE matric_number = ?").run(matricNumber);
+    
+    res.json({ success: true, txHash: tx.hash });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -------------------------------------------------------
 // Start Server
 // -------------------------------------------------------
 app.listen(PORT, () => {
