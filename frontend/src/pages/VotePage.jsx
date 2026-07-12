@@ -5,7 +5,7 @@ import { DEPLOYMENT } from "../config/deployment";
 import { useToast } from "../components/Toast";
 import { QRCodeSVG } from "qrcode.react";
 import * as snarkjs from "snarkjs";
-import { scanFingerprint, matricToFieldElement } from "../services/biometric";
+import { verifyFingerprint, matricToFieldElement } from "../services/biometric";
 
 const MATRIC_PATTERN = /^\d{4}\/\d\/\d{5}[A-Z]{2}$/i;
 const STEPS = ["Verify Identity", "Select Candidate", "Confirm & Submit"];
@@ -34,7 +34,7 @@ export default function VotePage() {
     
     // Simulate Hardware Biometric Scan (Fingerprint)
     setIsScanning(true);
-    const fingerprintHash = await scanFingerprint(cleanMatric);
+    const fingerprintHash = await verifyFingerprint(cleanMatric);
     setIsScanning(false);
 
     setVerifyLoading(true);

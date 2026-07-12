@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api } from "../services/api";
 import { useToast } from "../components/Toast";
-import { scanFingerprint, getPoseidon, matricToFieldElement } from "../services/biometric";
+import { enrollFingerprint, getPoseidon, matricToFieldElement } from "../services/biometric";
 
 const MATRIC_PATTERN = /^\d{4}\/\d\/\d{5}[A-Z]{2}$/i;
 
@@ -10,6 +10,7 @@ export default function EnrollPage() {
   const [matricNumber, setMatricNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanStatus, setScanStatus] = useState("Please place your finger firmly on the scanner to generate your cryptographic identity.");
   const [result, setResult] = useState(null);
   const [fieldError, setFieldError] = useState("");
   const toast = useToast();
@@ -55,8 +56,10 @@ export default function EnrollPage() {
       const { students } = await api.getStudents();
       const student = students.find(s => s.matric_number === cleanMatric);
 
-      // 2. Scan fingerprint locally via hardware bridge
-      const fingerprintHash = await scanFingerprint(cleanMatric);
+      // 2. Scan fingerprint locally via hardware bridge (this will now trigger the 2-step enrollment on the Pi)
+      const fingerprintHash = await enrollFingerprint(cleanMatric, (statusMessage) => {
+        setScanStatus(statusMessage);
+      });
       
       // 3. Compute Poseidon hash locally
       const p = await getPoseidon();
@@ -83,6 +86,7 @@ export default function EnrollPage() {
     setMatricNumber("");
     setResult(null);
     setFieldError("");
+    setScanStatus("Please place your finger firmly on the scanner to generate your cryptographic identity.");
   }
 
   return (
@@ -135,7 +139,15 @@ export default function EnrollPage() {
           {step === 2 && (
             <div className="fade-in" style={{ textAlign: "center", padding: "20px 0" }}>
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{matricNumber} Verified</div>
-              <div style={{ color: "var(--text-secondary)", fontSize: 13, marginBottom: 30 }}>Please place your finger firmly on the scanner to generate your cryptographic identity.</div>
+              <div style={{ 
+                color: isScanning ? "var(--accent)" : "var(--text-secondary)", 
+                fontSize: 14, 
+                fontWeight: isScanning ? 600 : 400,
+                marginBottom: 30,
+                transition: "all 0.3s"
+              }}>
+                {scanStatus}
+              </div>
               
               <div style={{ 
                 position: "relative", width: 120, height: 120, margin: "0 auto 30px auto", 
