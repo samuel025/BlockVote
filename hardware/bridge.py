@@ -44,3 +44,4 @@ if __name__ == '__main__':
     print("🚀 Hardware Bridge Running on port 5000")
     print("Your Vercel frontend can now securely talk to the hardware!")
     app.run(host='127.0.0.1', port=5000)
+

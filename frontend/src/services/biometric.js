@@ -41,6 +41,7 @@ export async function scanFingerprint(matricNumber) {
     }
   } catch (err) {
     console.warn("Hardware bridge not detected on localhost:5000. Falling back to software simulation.");
+    alert("DEVELOPER WARNING:\nCould not connect to the physical fingerprint scanner on the Raspberry Pi (Hardware Bridge not running).\n\nFalling back to software simulation.");
   }
 
   // 2. Fallback: Software simulation for testing on your laptop without the Pi connected
